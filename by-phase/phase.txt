@@ -1,0 +1,297 @@
+================================================================================
+  PRODUCTION-GRADE MCP AGENTIC SYSTEM — 13-PHASE ROADMAP
+  From Idea → Shipped System → Documentation
+================================================================================
+
+PHASE 1 — IDEA & PROBLEM DEFINITION
+--------------------------------------------------------------------------------
+Goal:    Nail the "why" before writing any code.
+Deliver: Problem statement, user personas, success metrics, non-goals.
+
+Tasks:
+  • Identify the real pain (e.g. support agents jumping across Postgres,
+    Elasticsearch, S3, vector DB for every ticket).
+  • Define who uses the system (human agents, end customers, admins).
+  • Write measurable outcomes (faster resolution, fewer hallucinations,
+    bounded cost per request).
+  • List explicit non-goals (not a chatbot that auto-refunds, not a demo
+    with a single @tool returning "hello world").
+  • Sketch the agent use case: what question goes in, what artifact comes out.
+
+Exit criteria:
+  ✓ One-page problem brief approved
+  ✓ Success metrics defined (latency, accuracy, cost ceiling, approval gates)
+
+
+PHASE 2 — REQUIREMENTS & ARCHITECTURE DESIGN
+--------------------------------------------------------------------------------
+Goal:    Design the system as layered components before implementation.
+Deliver: Architecture diagram, component list, request pipeline order, tech stack.
+
+Tasks:
+  • Map the twelve production components (transport, auth, policy, registry,
+    validation, execution, reliability, rate limit, cache, errors,
+    observability, governance).
+  • Fix middleware ordering (trace → auth → tenant → validate → policy →
+    rate limit → cache → circuit breaker → execute → errors → audit).
+  • Choose transports: stdio (local) + Streamable HTTP (remote, stateless).
+  • Choose data plane (Postgres, Elasticsearch, S3, vector store).
+  • Separate resource server (MCP) from authorization server (OAuth IdP).
+  • Plan three-level tool hierarchy: atomic → composed → workflow.
+
+Exit criteria:
+  ✓ Architecture doc with request-path diagram
+  ✓ Component ownership and dependency graph agreed
+  ✓ Tech stack locked (Python 3.11+, MCP SDK, Redis, OTel, Prometheus)
+
+
+PHASE 3 — PROJECT FOUNDATION & REPO SCAFFOLDING
+--------------------------------------------------------------------------------
+Goal:    Create a maintainable monorepo skeleton.
+Deliver: pyproject.toml, src layout, config files, Docker Compose baseline.
+
+Tasks:
+  • Initialise package structure (src/atlas_mcp/ with module per concern).
+  • Add dev tooling (pytest, ruff/black, type hints).
+  • Create config/ for policy.yaml, http_allowlist.yaml, env templates.
+  • Add docker-compose.yml with Postgres, Redis, Elasticsearch, OTel, Prometheus.
+  • Write deploy/sql/init.sql with tenant schema and Row-Level Security.
+  • Set up CI stub (lint + test on push).
+
+Exit criteria:
+  ✓ `pip install -e .` works
+  ✓ `docker compose up` brings infra online
+  ✓ Empty server module imports without error
+
+
+PHASE 4 — TRANSPORT LAYER & MCP SERVER CORE
+--------------------------------------------------------------------------------
+Goal:    Stand up a working MCP server that accepts tool calls.
+Deliver: server.py with stdio + Streamable HTTP, session management.
+
+Tasks:
+  • Implement MCP server bootstrap (FastMCP or official SDK patterns).
+  • Wire Streamable HTTP in stateless mode for horizontal scaling.
+  • Add stdio transport for Claude Desktop / Cursor local dev.
+  • Implement call_tool dispatch handler as the central pipeline entry.
+  • Store session state in Redis when needed (not on the process).
+  • Expose health/readiness endpoints for orchestrators (K8s, ECS).
+
+Exit criteria:
+  ✓ MCP client can list tools and call a stub tool over HTTP and stdio
+  ✓ Server survives restart without sticky-session requirement
+
+
+PHASE 5 — AUTHENTICATION & AUTHORIZATION
+--------------------------------------------------------------------------------
+Goal:    Secure every tool call with identity and deny-by-default policy.
+Deliver: OAuth/JWT validation, RBAC/ABAC policy engine, auth middleware.
+
+Tasks:
+  • Implement JWT validation against external JWKS (resource-server model).
+  • Parse MCP-specific claims: tenant, act.sub (actor), scope.
+  • Build policy engine (YAML-driven, glob resources, deny beats allow).
+  • Add auth middleware before any tool execution.
+  • Enforce tool-level scopes (e.g. tool:postgres:read).
+  • Add outbound HTTP allowlist for SSRF protection.
+
+Exit criteria:
+  ✓ Unauthenticated requests rejected
+  ✓ Policy denies calls outside tenant scope
+  ✓ Unit tests for allow/deny rule precedence
+
+
+PHASE 6 — TOOL REGISTRY, VALIDATION & ERROR FRAMEWORK
+--------------------------------------------------------------------------------
+Goal:    Make tools discoverable, safe to call, and failures machine-readable.
+Deliver: registry.py, Pydantic schemas, structured error framework (SERF).
+
+Tasks:
+  • Build dynamic tool registry with .well-known capability metadata.
+  • Define Pydantic input/output schemas per tool (enum constraints, bounds).
+  • Treat agent-generated input as adversarial by default.
+  • Implement structured errors with retryable flag, hint, and error codes.
+  • Normalise all exceptions to MCP wire format before response.
+
+Exit criteria:
+  ✓ Invalid payloads rejected before policy/rate-limit spend
+  ✓ Errors are JSON-parseable with actionable hints
+  ✓ Tool list reflects registered capabilities dynamically
+
+
+PHASE 7 — TOOL EXECUTION ENGINE (ATOMIC → COMPOSED → WORKFLOW)
+--------------------------------------------------------------------------------
+Goal:    Connect heterogeneous data sources behind one tool surface.
+Deliver: base.py executor, atomic tools, composed tools, workflow tools.
+
+Tasks:
+  • Atomic layer: postgres, elasticsearch, s3, embeddings, vector_search,
+    http_client — each wraps one backend with timeouts.
+  • Composed layer: hybrid_search, semantic_search — orchestrate atomics.
+  • Workflow layer: customer.build_context — domain-specific bundles.
+  • Shared Tool base class: validate → execute → normalise → audit hook.
+  • Seed realistic test data in Postgres/ES for integration tests.
+
+Exit criteria:
+  ✓ Each atomic tool works against docker-compose infra
+  ✓ Workflow tool returns merged customer context in one call
+  ✓ Integration tests cover happy path and backend failure
+
+
+PHASE 8 — RELIABILITY (CIRCUIT BREAKER, RETRY, ATBA)
+--------------------------------------------------------------------------------
+Goal:    Survive downstream outages without cascading failure.
+Deliver: circuit_breaker.py, retry.py, Adaptive Timeout Budget Allocation.
+
+Tasks:
+  • Implement circuit breaker states: closed → open → half-open.
+  • Add exponential backoff retry for idempotent/read operations only.
+  • Implement ATBA: allocate timeout budget across tool chain dynamically.
+  • Per-backend breaker instances (Postgres, ES, S3, embeddings API).
+  • Emit metrics on breaker trips and retry counts.
+
+Exit criteria:
+  ✓ Open circuit fast-fails without hammering dead backend
+  ✓ Half-open probe recovers gracefully
+  ✓ Tests simulate outage and verify budget behaviour
+
+
+PHASE 9 — RATE LIMITING & CACHING
+--------------------------------------------------------------------------------
+Goal:    Control cost and protect backends under load.
+Deliver: Redis token-bucket limiter, two-tier cache (L1 + L2).
+
+Tasks:
+  • Per-tenant and per-tool rate limits via Redis Lua (atomic token bucket).
+  • Denied-by-policy calls must not consume quota (ordering already set).
+  • L1 in-process cache + L2 Redis with TTL and cache keys scoped by tenant.
+  • Stampede prevention (single-flight / lock on cache miss).
+  • Cache sits after rate limit, before circuit breaker (warm cache during outage).
+
+Exit criteria:
+  ✓ Burst traffic throttled per tenant
+  ✓ Repeated identical tool calls served from cache
+  ✓ Cache invalidation strategy documented
+
+
+PHASE 10 — OBSERVABILITY & GOVERNANCE
+--------------------------------------------------------------------------------
+Goal:    Make the system debuggable at 3 AM and safe for multi-tenant production.
+Deliver: OTel tracing, Prometheus metrics, audit logs, tenant isolation.
+
+Tasks:
+  • OpenTelemetry tracing middleware (first in stack, span per layer).
+  • Prometheus metrics: latency, error rate, cache hit ratio, breaker state.
+  • Immutable audit log: who (actor), what (tool), when, tenant, outcome.
+  • Tenant middleware extracting tenant from Principal.
+  • Approval gates for high-risk actions (refunds, write operations).
+  • Postgres Row-Level Security as defence-in-depth for tenant data.
+
+Exit criteria:
+  ✓ End-to-end trace visible in Jaeger/OTel collector
+  ✓ Grafana dashboard shows SLO-oriented metrics
+  ✓ Audit log answers "who called what tool for tenant X?"
+
+
+PHASE 11 — AGENTIC SYSTEM (MULTI-AGENT ORCHESTRATOR)
+--------------------------------------------------------------------------------
+Goal:    Build the product layer on top of MCP infrastructure.
+Deliver: Planner → Retriever → Synthesizer → Critic pipeline + MCP client.
+
+Tasks:
+  • Planner: structured JSON plan of information needs (no tool calls).
+  • Retriever: bounded tool-calling loop (max N iterations) via AtlasMCPClient.
+  • Client-side tool allowlist + server-side policy (belt and suspenders).
+  • Synthesizer: draft reply grounded only in retriever findings.
+  • Critic: verify no invented facts, flag approval-needed actions.
+  • Orchestrator: wire agents, enforce token/time/tool-call budgets.
+  • Memory module for conversation context within session bounds.
+  • CLI for local testing against running MCP server.
+
+Exit criteria:
+  ✓ End-to-end ticket question → grounded draft reply
+  ✓ Retriever cannot call tools outside allowlist
+  ✓ Critic blocks unapproved refund commitments
+  ✓ Run completes within configured cost/time ceiling
+
+
+PHASE 12 — TESTING, HARDENING & DEPLOYMENT
+--------------------------------------------------------------------------------
+Goal:    Prove production readiness and ship runnable artifacts.
+Deliver: Test suite, load test, deployment manifests, runbooks.
+
+Tasks:
+  • Unit tests: policy, errors, circuit breaker, validation schemas.
+  • Integration tests: full tool pipeline against docker-compose.
+  • Agent integration tests: orchestrator with mocked or live LLM.
+  • Load test rate limiter and cache under concurrent tenants.
+  • Security review: SSRF, injection, prompt-injection mitigations.
+  • Production Dockerfile, K8s/ECS manifests, secrets management pattern.
+  • Runbook: deploy, rollback, rotate keys, scale replicas, drain breaker.
+
+Exit criteria:
+  ✓ CI green on lint + unit + integration
+  ✓ Deployed to staging with smoke tests passing
+  ✓ Runbook reviewed by ops/on-call
+
+
+PHASE 13 — DOCUMENTATION & KNOWLEDGE TRANSFER
+--------------------------------------------------------------------------------
+Goal:    Enable others to understand, extend, operate, and contribute.
+Deliver: README, ARCHITECTURE.md, AGENT_SYSTEM.md, DEPLOYMENT.md, blog/walkthrough.
+
+Tasks:
+  • README: what it is, 12-component table, quickstart, architecture image.
+  • ARCHITECTURE.md: request path, middleware order rationale, per-component depth.
+  • AGENT_SYSTEM.md: four-agent design, contracts, budgets, approval flows.
+  • DEPLOYMENT.md: env vars, Docker Compose, production checklist, monitoring.
+  • Inline docstrings on public APIs and policy DSL examples.
+  • Long-form walkthrough (blog or internal doc) explaining "why" per phase.
+  • CONTRIBUTING.md: how to add a new tool, policy rule, or agent role.
+
+Exit criteria:
+  ✓ New engineer can run locally in < 30 minutes from README alone
+  ✓ Architecture decisions and trade-offs are written down
+  ✓ Operations team has deploy + incident response docs
+  ✓ Code and docs stay in sync (review docs in PR checklist)
+
+
+================================================================================
+  PHASE DEPENDENCY SUMMARY
+================================================================================
+
+  1 Idea ──► 2 Design ──► 3 Scaffold ──► 4 Transport
+                                              │
+                    ┌─────────────────────────┼─────────────────────────┐
+                    ▼                         ▼                         ▼
+              5 Auth/Policy            6 Registry/Errors          7 Tools
+                    │                         │                         │
+                    └─────────────────────────┼─────────────────────────┘
+                                              ▼
+                                    8 Reliability ──► 9 RateLimit/Cache
+                                              │
+                                              ▼
+                                    10 Observability/Governance
+                                              │
+                                              ▼
+                                    11 Agentic System
+                                              │
+                                              ▼
+                                    12 Test/Deploy ──► 13 Documentation
+
+================================================================================
+  REFERENCE REPO MAPPING (production-grade-mcp-agentic-system)
+================================================================================
+
+  Phase 4  → src/atlas_mcp/server.py
+  Phase 5  → src/atlas_mcp/auth/
+  Phase 6  → src/atlas_mcp/tools/registry.py, validation/, errors/
+  Phase 7  → src/atlas_mcp/tools/{atomic,composed,workflow}/
+  Phase 8  → src/atlas_mcp/reliability/
+  Phase 9  → src/atlas_mcp/ratelimit/, cache/
+  Phase 10 → src/atlas_mcp/observability/, governance/
+  Phase 11 → src/atlas_mcp/agents/
+  Phase 12 → tests/, docker-compose.yml, deploy/
+  Phase 13 → docs/, README.md
+
+================================================================================
