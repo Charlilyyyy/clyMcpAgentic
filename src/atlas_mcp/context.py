@@ -29,7 +29,11 @@ class RequestContext:
     trace_id: str | None = None
 
     def has_scope(self, required: str) -> bool:
-        return required in self.scopes or "tool:*:admin" in self.scopes
+        if required in self.scopes:
+            return True
+        if required.startswith("tool:") and "tool:*:admin" in self.scopes:
+            return True
+        return False
 
     def build_envelope(self, tool: str, arguments: dict) -> ToolCallEnvelope:
         return ToolCallEnvelope(

@@ -54,3 +54,17 @@ def test_mcp_rejects_invalid_bearer_token() -> None:
         )
     assert response.status_code == 401
     assert response.json() == {"error": "invalid_token"}
+
+
+def test_mcp_rejects_cross_tenant_header_without_impersonate_scope() -> None:
+    server = AtlasServer(ServerSettings(auth_dev_token="dev-secret"))
+    with TestClient(build_http_app(server)) as client:
+        response = client.post(
+            "/mcp/",
+            headers={
+                "Authorization": "Bearer dev-secret",
+                "X-Tenant-Id": "globex",
+            },
+        )
+    assert response.status_code == 403
+    assert response.json() == {"error": "tenant_mismatch"}

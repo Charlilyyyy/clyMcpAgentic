@@ -12,6 +12,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
 from atlas_mcp.auth.middleware import AuthMiddleware
+from atlas_mcp.governance.tenant import TenantMiddleware
 from atlas_mcp.transport.middleware import ContextMiddleware
 
 if TYPE_CHECKING:
@@ -49,6 +50,7 @@ def build_http_app(server: "AtlasServer") -> Starlette:
 
     middleware = [
         Middleware(AuthMiddleware, settings=server.settings),
+        Middleware(TenantMiddleware, settings=server.settings),
         Middleware(ContextMiddleware, settings=server.settings),
     ]
 

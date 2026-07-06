@@ -8,6 +8,12 @@
 # rule is a denial.
 
 rules:
+  # ── Built-in health stub ───────────────────────────────────────────────
+  - id: stub-server-ping
+    subjects: ["*"]
+    actions: ["server.ping"]
+    resources: ["*"]
+
   # ── Support copilot agents ─────────────────────────────────────────────
   - id: support-agents-build-context
     subjects: ["role:support_copilot", "role:human_agent"]

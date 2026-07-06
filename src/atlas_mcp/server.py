@@ -12,13 +12,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from pathlib import Path
 
 import uvicorn
 from mcp.server import Server
+from pydantic import BaseModel
 
+from atlas_mcp.auth.policy import PolicyEngine
 from atlas_mcp.config import ServerSettings, get_settings
 from atlas_mcp.context import current_context
-from atlas_mcp.errors.framework import ToolError, to_call_tool_error
+from atlas_mcp.errors.framework import PolicyError, ToolError, to_call_tool_error
+from atlas_mcp.tools.base import Tool
 from atlas_mcp.tools.registry import ToolRegistry
 from atlas_mcp.validation.schemas import ToolCallEnvelope
 
@@ -32,6 +36,10 @@ class AtlasServer:
         self.settings = settings
         self.mcp = Server(settings.service_name)
         self.registry = ToolRegistry()
+        self.policy = PolicyEngine.from_file(
+            Path(settings.policy_file),
+            default_deny=settings.policy_default_deny,
+        )
         self._register_mcp_handlers()
 
     def _register_mcp_handlers(self) -> None:
@@ -50,13 +58,27 @@ class AtlasServer:
                 return to_call_tool_error(exc)
 
     async def dispatch(self, envelope: ToolCallEnvelope) -> dict:
-        """Central request pipeline entry for tool calls.
-
-        Auth, policy, rate limiting, cache, and circuit breaking are layered
-        on in later commits. Today: validate arguments and execute the tool.
-        """
+        """Central request pipeline entry for tool calls."""
         tool = self.registry.get(envelope.tool)
         validated_args = tool.validate(envelope.arguments)
+
+        ctx = current_context()
+        for required in tool.meta.scopes_required:
+            if not ctx.has_scope(required):
+                raise PolicyError(
+                    "insufficient_scope",
+                    retryable=False,
+                    hint=f"missing required scope {required!r}",
+                )
+
+        self.policy.check(
+            subject=envelope.caller,
+            tenant=envelope.tenant,
+            action=_policy_action(tool),
+            resource=_policy_resource(tool, validated_args),
+            context=_policy_context(validated_args),
+        )
+
         logger.info(
             "tool_dispatch",
             extra={
@@ -73,6 +95,25 @@ class AtlasServer:
 
     async def shutdown(self) -> None:
         return None
+
+
+def _policy_action(tool: Tool) -> str:
+    return tool.meta.name
+
+
+def _policy_resource(tool: Tool, args: BaseModel) -> str:
+    _ = args
+    return tool.meta.name
+
+
+def _policy_context(args: BaseModel) -> dict:
+    data = args.model_dump()
+    context: dict = {}
+    if "sql" in data:
+        context["sql"] = data["sql"]
+    if "columns" in data:
+        context["columns"] = data["columns"]
+    return context
 
 
 def main() -> None:

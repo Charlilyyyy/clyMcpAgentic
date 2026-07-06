@@ -22,15 +22,20 @@ class ContextMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         principal: Principal | None = getattr(request.state, "principal", None)
+        tenant = getattr(request.state, "tenant", None)
+        if tenant is None and principal is not None:
+            tenant = principal.tenant
+        elif tenant is None:
+            tenant = request.headers.get(self.settings.tenant_header, "default")
+
         if principal is not None:
             ctx = RequestContext(
                 subject=principal.subject,
-                tenant=principal.tenant,
+                tenant=tenant,
                 scopes=tuple(principal.scopes),
                 delegator=principal.delegator,
             )
         else:
-            tenant = request.headers.get(self.settings.tenant_header, "default")
             ctx = dev_context(tenant=tenant)
 
         token = set_context(ctx)
