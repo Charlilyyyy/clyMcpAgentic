@@ -10,6 +10,7 @@ The same tool registry and dispatch pipeline feed both transports.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 import uvicorn
@@ -81,7 +82,10 @@ def main() -> None:
     server = AtlasServer(settings)
 
     if settings.transport == "stdio":
-        raise SystemExit("stdio transport is wired in the next commit — set ATLAS_TRANSPORT=http")
+        from atlas_mcp.transport.stdio import run_stdio
+
+        asyncio.run(run_stdio(server))
+        return
 
     from atlas_mcp.transport.http import build_http_app
 
