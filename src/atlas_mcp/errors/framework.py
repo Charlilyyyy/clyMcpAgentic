@@ -41,3 +41,14 @@ class ToolNotFoundError(ToolError):
             hint=f"no tool named {name!r} is registered",
             context={"tool": name},
         )
+
+
+def to_call_tool_error(exc: ToolError):
+    """Convert a :class:`ToolError` into an MCP ``CallToolResult``."""
+    from mcp.types import CallToolResult, TextContent
+
+    return CallToolResult(
+        content=[TextContent(type="text", text=f"{exc.code}: {exc.hint or ''}")],
+        structuredContent=exc.to_dict(),
+        isError=True,
+    )
