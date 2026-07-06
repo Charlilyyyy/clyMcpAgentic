@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
+from urllib.parse import urlparse
 
 import uvicorn
 from mcp.server import Server
@@ -22,6 +23,7 @@ from atlas_mcp.auth.policy import PolicyEngine
 from atlas_mcp.config import ServerSettings, get_settings
 from atlas_mcp.context import current_context
 from atlas_mcp.errors.framework import PolicyError, ToolError, to_call_tool_error
+from atlas_mcp.governance.http_allowlist import HttpAllowlist
 from atlas_mcp.tools.base import Tool
 from atlas_mcp.tools.registry import ToolRegistry
 from atlas_mcp.validation.schemas import ToolCallEnvelope
@@ -40,6 +42,7 @@ class AtlasServer:
             Path(settings.policy_file),
             default_deny=settings.policy_default_deny,
         )
+        self.http_allowlist = HttpAllowlist.from_file(settings.http_allowlist_file)
         self._register_mcp_handlers()
 
     def _register_mcp_handlers(self) -> None:
@@ -78,6 +81,7 @@ class AtlasServer:
             resource=_policy_resource(tool, validated_args),
             context=_policy_context(validated_args),
         )
+        _enforce_http_allowlist(self.http_allowlist, envelope.tenant, validated_args)
 
         logger.info(
             "tool_dispatch",
@@ -114,6 +118,14 @@ def _policy_context(args: BaseModel) -> dict:
     if "columns" in data:
         context["columns"] = data["columns"]
     return context
+
+
+def _enforce_http_allowlist(allowlist: HttpAllowlist, tenant: str, args: BaseModel) -> None:
+    url = args.model_dump().get("url")
+    if not url:
+        return
+    host = urlparse(str(url)).hostname or ""
+    allowlist.check(tenant, host)
 
 
 def main() -> None:

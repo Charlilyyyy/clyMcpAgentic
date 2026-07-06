@@ -35,6 +35,7 @@ class ServerSettings(BaseSettings):
     # Authorization
     policy_default_deny: bool = True
     policy_file: str = "config/policy.yaml"
+    http_allowlist_file: str = "config/http_allowlist.yaml"
 
     # Tool registry
     dynamic_toolsets: bool = True
