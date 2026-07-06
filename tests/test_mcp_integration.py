@@ -62,7 +62,7 @@ async def test_in_process_list_and_call_stub_tool() -> None:
 
 @pytest.mark.asyncio
 async def test_http_list_and_call_stub_tool() -> None:
-    server = AtlasServer(ServerSettings())
+    server = AtlasServer(ServerSettings(auth_dev_token="test-token"))
     app = build_http_app(server)
 
     async with app.router.lifespan_context(app):
@@ -71,7 +71,7 @@ async def test_http_list_and_call_stub_tool() -> None:
             transport=transport,
             base_url="http://test",
             follow_redirects=True,
-            headers={"X-Tenant-Id": "globex"},
+            headers={"Authorization": "Bearer test-token"},
         ) as http_client:
             async with streamable_http_client(
                 "http://test/mcp/",
@@ -90,7 +90,7 @@ async def test_http_list_and_call_stub_tool() -> None:
                     assert result.structuredContent == {
                         "pong": True,
                         "message": "http-path",
-                        "tenant": "globex",
+                        "tenant": "acme",
                     }
 
 

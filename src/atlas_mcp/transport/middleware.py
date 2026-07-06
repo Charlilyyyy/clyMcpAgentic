@@ -1,18 +1,15 @@
-"""Middleware that binds request context before MCP handlers run.
-
-Auth middleware replaces the dev defaults in a later commit. Until then,
-tenant is read from ``X-Tenant-Id`` so tool calls are tenant-scoped.
-"""
+"""Middleware that binds request context before MCP handlers run."""
 
 from __future__ import annotations
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
+from atlas_mcp.auth.oauth import Principal
 from atlas_mcp.config import ServerSettings
-from atlas_mcp.context import dev_context, reset_context, set_context
+from atlas_mcp.context import RequestContext, dev_context, reset_context, set_context
 
-_PUBLIC_PATHS = frozenset({"/.well-known/mcp-server", "/healthz", "/readyz"})
+_PUBLIC_PATHS = frozenset({"/.well-known/mcp-server", "/healthz", "/readyz", "/metrics"})
 
 
 class ContextMiddleware(BaseHTTPMiddleware):
@@ -24,8 +21,19 @@ class ContextMiddleware(BaseHTTPMiddleware):
         if request.url.path in _PUBLIC_PATHS:
             return await call_next(request)
 
-        tenant = request.headers.get(self.settings.tenant_header, "default")
-        token = set_context(dev_context(tenant=tenant))
+        principal: Principal | None = getattr(request.state, "principal", None)
+        if principal is not None:
+            ctx = RequestContext(
+                subject=principal.subject,
+                tenant=principal.tenant,
+                scopes=tuple(principal.scopes),
+                delegator=principal.delegator,
+            )
+        else:
+            tenant = request.headers.get(self.settings.tenant_header, "default")
+            ctx = dev_context(tenant=tenant)
+
+        token = set_context(ctx)
         try:
             return await call_next(request)
         finally:

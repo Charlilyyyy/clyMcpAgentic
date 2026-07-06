@@ -33,3 +33,24 @@ def test_well_known_lists_stub_tool() -> None:
     payload = response.json()
     assert payload["server"]["name"] == "atlas-mcp"
     assert any(tool["name"] == "server.ping" for tool in payload["tools_summary"])
+
+
+def test_mcp_rejects_missing_bearer_token() -> None:
+    server = AtlasServer(ServerSettings(auth_dev_token="dev-secret"))
+    with TestClient(build_http_app(server)) as client:
+        response = client.post("/mcp/")
+    assert response.status_code == 401
+    assert response.json() == {"error": "missing_token"}
+    assert "WWW-Authenticate" in response.headers
+    assert 'error="missing_token"' in response.headers["WWW-Authenticate"]
+
+
+def test_mcp_rejects_invalid_bearer_token() -> None:
+    server = AtlasServer(ServerSettings(auth_dev_token="dev-secret"))
+    with TestClient(build_http_app(server)) as client:
+        response = client.post(
+            "/mcp/",
+            headers={"Authorization": "Bearer wrong-secret"},
+        )
+    assert response.status_code == 401
+    assert response.json() == {"error": "invalid_token"}
