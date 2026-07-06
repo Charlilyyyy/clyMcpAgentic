@@ -35,6 +35,10 @@ class AuthError(ToolError):
     """Token missing, expired, or invalid."""
 
 
+class PolicyError(ToolError):
+    """The caller is authenticated but not permitted."""
+
+
 class ToolNotFoundError(ToolError):
     """Requested tool name is not registered."""
 
