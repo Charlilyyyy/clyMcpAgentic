@@ -28,6 +28,7 @@ class ServerSettings(BaseSettings):
     auth_audience: str = "atlas-mcp"
     auth_jwks_url: str = "https://auth.atlas.local/.well-known/jwks.json"
     auth_signing_key_path: str | None = None
+    auth_dev_token: str | None = None
     auth_require_pkce: bool = True
     auth_access_token_ttl_seconds: int = 900
 

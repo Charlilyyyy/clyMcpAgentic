@@ -31,6 +31,10 @@ class ValidationError(ToolError):
     """Input failed schema or constraint validation."""
 
 
+class AuthError(ToolError):
+    """Token missing, expired, or invalid."""
+
+
 class ToolNotFoundError(ToolError):
     """Requested tool name is not registered."""
 
