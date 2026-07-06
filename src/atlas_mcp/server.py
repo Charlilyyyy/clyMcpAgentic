@@ -5,15 +5,14 @@ Atlas-MCP ships two transports from day one:
 * stdio, for local development and single-user MCP hosts like Claude Desktop.
 * Streamable HTTP, for remote deployments, multi-user access, and horizontal scaling.
 
-The same tool registry and dispatch pipeline feed both transports. HTTP and
-stdio wiring are added in subsequent commits; this module owns the MCP
-``Server`` instance, handler registration, and the central ``dispatch`` path.
+The same tool registry and dispatch pipeline feed both transports.
 """
 
 from __future__ import annotations
 
 import logging
 
+import uvicorn
 from mcp.server import Server
 
 from atlas_mcp.config import ServerSettings, get_settings
@@ -76,17 +75,32 @@ class AtlasServer:
 
 
 def main() -> None:
-    """CLI entry point for ``atlas-mcp``.
-
-    Transport selection (stdio vs HTTP) is wired in a later commit.
-    """
+    """CLI entry point for ``atlas-mcp``."""
     logging.basicConfig(level=logging.INFO)
     settings = get_settings()
     server = AtlasServer(settings)
-    logger.info(
-        "atlas-mcp core ready — transport wiring pending",
-        extra={"transport": settings.transport, "tools": len(server.registry)},
+
+    if settings.transport == "stdio":
+        raise SystemExit("stdio transport is wired in the next commit — set ATLAS_TRANSPORT=http")
+
+    from atlas_mcp.transport.http import build_http_app
+
+    app = build_http_app(server)
+    uvicorn.run(app, host=settings.http_host, port=settings.http_port)
+
+
+async def run_http(server: AtlasServer) -> None:
+    """Programmatic entry for tests and embedding."""
+    from atlas_mcp.transport.http import build_http_app
+
+    config = uvicorn.Config(
+        build_http_app(server),
+        host=server.settings.http_host,
+        port=server.settings.http_port,
+        log_level=server.settings.log_level.lower(),
     )
+    http_server = uvicorn.Server(config)
+    await http_server.serve()
 
 
 if __name__ == "__main__":
