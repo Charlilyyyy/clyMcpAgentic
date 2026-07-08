@@ -23,7 +23,12 @@ async def test_stub_ping_run() -> None:
     tool = StubPingTool()
     args = tool.validate({"message": "hello"})
     result = await tool.run("acme", args)
-    assert result == {"pong": True, "message": "hello", "tenant": "acme"}
+    assert result == {
+        "pong": True,
+        "message": "hello",
+        "tenant": "acme",
+        "mode": "echo",
+    }
 
 
 def test_get_unknown_tool_raises() -> None:

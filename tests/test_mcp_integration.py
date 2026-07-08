@@ -53,6 +53,7 @@ async def test_in_process_list_and_call_stub_tool() -> None:
                     "pong": True,
                     "message": "stdio-path",
                     "tenant": "acme",
+                    "mode": "echo",
                 }
             tg.cancel_scope.cancel()
     finally:
@@ -91,6 +92,7 @@ async def test_http_list_and_call_stub_tool() -> None:
                         "pong": True,
                         "message": "http-path",
                         "tenant": "acme",
+                        "mode": "echo",
                     }
 
 
@@ -122,4 +124,5 @@ async def test_stdio_subprocess_list_and_call_stub_tool() -> None:
                 "pong": True,
                 "message": "subprocess",
                 "tenant": "acme",
+                "mode": "echo",
             }

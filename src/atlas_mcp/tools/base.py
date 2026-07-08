@@ -12,6 +12,7 @@ from typing import Any, ClassVar
 from pydantic import BaseModel
 
 from atlas_mcp.errors.framework import ValidationError
+from atlas_mcp.validation.adversarial import bound_argument_tree
 
 
 class ToolLevel(str, Enum):
@@ -42,9 +43,16 @@ class Tool(ABC):
     input_schema: ClassVar[type[BaseModel]]
 
     def validate(self, arguments: dict[str, Any]) -> BaseModel:
-        """Validate tool arguments. Raises :class:`ValidationError` on failure."""
+        """Validate tool arguments. Raises :class:`ValidationError` on failure.
+
+        Bounds and nesting are checked before schema parse so oversized
+        adversarial payloads never reach Pydantic or policy evaluation.
+        """
+        bound_argument_tree(arguments)
         try:
             return self.input_schema.model_validate(arguments)
+        except ValidationError:
+            raise
         except Exception as exc:
             raise ValidationError(
                 code="invalid_arguments",

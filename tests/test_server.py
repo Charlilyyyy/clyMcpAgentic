@@ -32,7 +32,12 @@ async def test_dispatch_ping(server: AtlasServer) -> None:
         caller="dev:local",
     )
     result = await server.dispatch(envelope)
-    assert result == {"pong": True, "message": "hello", "tenant": "acme"}
+    assert result == {
+        "pong": True,
+        "message": "hello",
+        "tenant": "acme",
+        "mode": "echo",
+    }
 
 
 @pytest.mark.asyncio
