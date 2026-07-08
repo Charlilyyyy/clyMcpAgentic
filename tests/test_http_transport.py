@@ -32,7 +32,14 @@ def test_well_known_lists_stub_tool() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["server"]["name"] == "atlas-mcp"
-    assert any(tool["name"] == "server.ping" for tool in payload["tools_summary"])
+    assert payload["capabilities"]["tools"]["count"] == 1
+    assert "atomic" in payload["capabilities"]["tools"]["levels"]
+    summary = next(t for t in payload["tools_summary"] if t["name"] == "server.ping")
+    assert summary["level"] == "atomic"
+    assert "stub" in summary["tags"]
+    assert "scopes_required" in summary
+    assert "destructive" in summary
+    assert "cacheable" in summary
 
 
 def test_mcp_rejects_missing_bearer_token() -> None:
