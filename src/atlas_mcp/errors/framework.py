@@ -126,3 +126,30 @@ def to_call_tool_error(exc: ToolError):
         structuredContent=exc.to_dict(),
         isError=True,
     )
+
+
+def normalise_exception(exc: BaseException, *, tool: str | None = None) -> ToolError:
+    """Map any exception into the SERF taxonomy — never leak a traceback to agents.
+
+    :class:`ToolError` subclasses pass through unchanged. Everything else becomes
+    an :class:`UpstreamError` with a stable ``internal_error`` code. The original
+    type name is kept in ``context`` for operators; agents only see the hint.
+    """
+    if isinstance(exc, ToolError):
+        return exc
+
+    context: dict[str, Any] = {"exception_type": type(exc).__name__}
+    if tool:
+        context["tool"] = tool
+
+    return UpstreamError(
+        code="internal_error",
+        retryable=False,
+        hint="an unexpected error occurred; retry or contact an operator",
+        context=context,
+    )
+
+
+def as_call_tool_result(exc: BaseException, *, tool: str | None = None):
+    """Normalise *any* exception into an MCP ``CallToolResult`` error payload."""
+    return to_call_tool_error(normalise_exception(exc, tool=tool))

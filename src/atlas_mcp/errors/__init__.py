@@ -10,6 +10,8 @@ from atlas_mcp.errors.framework import (
     ToolNotFoundError,
     UpstreamError,
     ValidationError,
+    as_call_tool_result,
+    normalise_exception,
     to_call_tool_error,
     to_mcp_error,
 )
@@ -24,6 +26,8 @@ __all__ = [
     "ToolNotFoundError",
     "UpstreamError",
     "ValidationError",
+    "as_call_tool_result",
+    "normalise_exception",
     "to_call_tool_error",
     "to_mcp_error",
 ]

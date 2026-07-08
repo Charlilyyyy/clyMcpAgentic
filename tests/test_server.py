@@ -6,7 +6,12 @@ import pytest
 
 from atlas_mcp.auth.policy import PolicyEngine, Rule
 from atlas_mcp.config import ServerSettings
-from atlas_mcp.errors.framework import PolicyError, ToolNotFoundError, ValidationError
+from atlas_mcp.errors.framework import (
+    PolicyError,
+    ToolNotFoundError,
+    UpstreamError,
+    ValidationError,
+)
 from atlas_mcp.server import AtlasServer
 from atlas_mcp.validation.schemas import ToolCallEnvelope
 
@@ -98,3 +103,49 @@ async def test_dispatch_denied_when_default_deny(server: AtlasServer) -> None:
     )
     with pytest.raises(PolicyError):
         await server.dispatch(envelope)
+
+
+@pytest.mark.asyncio
+async def test_dispatch_normalises_unexpected_tool_failures(server: AtlasServer) -> None:
+    from atlas_mcp.tools.base import Tool, ToolLevel, ToolMetadata
+    from atlas_mcp.validation.adversarial import StrictToolModel
+
+    class _BoomInput(StrictToolModel):
+        pass
+
+    class _BoomTool(Tool):
+        meta = ToolMetadata(
+            name="demo.boom",
+            description="Raises a non-SERF exception.",
+            level=ToolLevel.ATOMIC,
+            scopes_required=(),
+            cacheable=False,
+            tags=("demo",),
+        )
+        input_schema = _BoomInput
+
+        async def run(self, tenant: str, args: _BoomInput) -> dict:
+            raise RuntimeError("database credentials leaked")
+
+    server.registry.register(_BoomTool())
+    server.policy = PolicyEngine(
+        rules=[
+            Rule(
+                id="allow-boom",
+                subjects=("*",),
+                actions=("demo.boom",),
+                resources=("*",),
+            )
+        ]
+    )
+    envelope = ToolCallEnvelope(
+        tool="demo.boom",
+        arguments={},
+        tenant="acme",
+        caller="dev:local",
+    )
+    with pytest.raises(UpstreamError) as exc_info:
+        await server.dispatch(envelope)
+    assert exc_info.value.code == "internal_error"
+    assert "credentials" not in (exc_info.value.hint or "")
+    assert exc_info.value.context["exception_type"] == "RuntimeError"

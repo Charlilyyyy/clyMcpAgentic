@@ -10,6 +10,8 @@ from atlas_mcp.errors.framework import (
     ToolError,
     UpstreamError,
     ValidationError,
+    as_call_tool_result,
+    normalise_exception,
     to_call_tool_error,
     to_mcp_error,
 )
@@ -71,3 +73,35 @@ def test_call_tool_error_is_json_parseable() -> None:
 def test_tool_error_str_is_agent_readable() -> None:
     exc = ToolError(code="boom", hint="try something else")
     assert str(exc) == "boom: try something else"
+
+
+def test_normalise_exception_passes_through_tool_errors() -> None:
+    original = AuthError(code="invalid_token", retryable=False, hint="bad token")
+    assert normalise_exception(original) is original
+
+
+def test_normalise_exception_wraps_unexpected_errors() -> None:
+    wrapped = normalise_exception(RuntimeError("secret traceback detail"), tool="server.ping")
+    assert isinstance(wrapped, UpstreamError)
+    assert wrapped.code == "internal_error"
+    assert wrapped.retryable is False
+    assert "secret traceback" not in (wrapped.hint or "")
+    assert wrapped.context["exception_type"] == "RuntimeError"
+    assert wrapped.context["tool"] == "server.ping"
+
+
+def test_as_call_tool_result_normalises_bare_exceptions() -> None:
+    result = as_call_tool_result(ValueError("leaky"), tool="demo.tool")
+    assert result.isError is True
+    assert result.structuredContent["code"] == "internal_error"
+    assert result.structuredContent["context"]["exception_type"] == "ValueError"
+    assert "leaky" not in result.structuredContent["hint"]
+    assert result.structuredContent["context"]["tool"] == "demo.tool"
+
+
+def test_as_call_tool_result_preserves_serf_tool_errors() -> None:
+    result = as_call_tool_result(
+        ValidationError(code="invalid_arguments", hint="too long", context={"tool": "x"})
+    )
+    assert result.structuredContent["code"] == "invalid_arguments"
+    assert result.structuredContent["hint"] == "too long"

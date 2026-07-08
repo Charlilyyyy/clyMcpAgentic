@@ -22,7 +22,7 @@ from pydantic import BaseModel
 from atlas_mcp.auth.policy import PolicyEngine
 from atlas_mcp.config import ServerSettings, get_settings
 from atlas_mcp.context import current_context
-from atlas_mcp.errors.framework import PolicyError, ToolError, to_call_tool_error
+from atlas_mcp.errors.framework import PolicyError, ToolError, as_call_tool_result, normalise_exception
 from atlas_mcp.governance.http_allowlist import HttpAllowlist
 from atlas_mcp.tools.base import Tool
 from atlas_mcp.tools.registry import ToolRegistry
@@ -57,8 +57,14 @@ class AtlasServer:
             envelope = ctx.build_envelope(name, arguments)
             try:
                 return await self.dispatch(envelope)
-            except ToolError as exc:
-                return to_call_tool_error(exc)
+            except Exception as exc:
+                # Never leak Python tracebacks to MCP clients — SERF only.
+                if not isinstance(exc, ToolError):
+                    logger.exception(
+                        "unhandled_tool_error",
+                        extra={"tool": name, "tenant": envelope.tenant},
+                    )
+                return as_call_tool_result(exc, tool=name)
 
     async def dispatch(self, envelope: ToolCallEnvelope) -> dict:
         """Central request pipeline entry for tool calls."""
@@ -91,7 +97,16 @@ class AtlasServer:
                 "caller": envelope.caller,
             },
         )
-        return await tool.execute(envelope.tenant, validated_args)
+        try:
+            return await tool.execute(envelope.tenant, validated_args)
+        except ToolError:
+            raise
+        except Exception as exc:
+            logger.exception(
+                "tool_execution_failed",
+                extra={"tool": envelope.tool, "tenant": envelope.tenant},
+            )
+            raise normalise_exception(exc, tool=envelope.tool) from exc
 
     async def startup(self) -> None:
         await self.registry.discover()
