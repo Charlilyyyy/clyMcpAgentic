@@ -68,7 +68,8 @@ class ServerSettings(BaseSettings):
     service_name: str = "atlas-mcp"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     metrics_enabled: bool = True
-    audit_log_path: str = "/var/log/atlas/audit.jsonl"
+    audit_enabled: bool = True
+    audit_log_path: str = "logs/atlas-audit.jsonl"
 
     # Governance / multi-tenancy
     tenant_header: str = "X-Tenant-Id"

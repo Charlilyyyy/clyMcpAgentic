@@ -29,7 +29,12 @@ class AuditLogger:
 
     def __init__(self, path: str) -> None:
         self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._dir_ready = False
+
+    def _ensure_dir(self) -> None:
+        if not self._dir_ready:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self._dir_ready = True
 
     def record(
         self,
@@ -56,6 +61,7 @@ class AuditLogger:
             "status": status,
             "error_code": error_code,
         }
+        self._ensure_dir()
         with self.path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(event, default=str) + "\n")
         return event

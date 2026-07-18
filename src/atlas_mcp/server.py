@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -27,12 +28,14 @@ from atlas_mcp.ratelimit.limiter import InMemoryTokenBucket, RateLimiter
 from atlas_mcp.errors.framework import (
     CircuitOpenError,
     PolicyError,
+    RateLimitError,
     ToolError,
     as_call_tool_result,
     normalise_exception,
 )
 from atlas_mcp.governance.approval import ApprovalGate, InMemoryApprovalStore
 from atlas_mcp.governance.http_allowlist import HttpAllowlist
+from atlas_mcp.observability.audit import AuditLogger
 from atlas_mcp.observability.metrics import MetricsRegistry
 from atlas_mcp.reliability import ATBA, CircuitBreakerRegistry, ReliabilityMetrics, with_retry
 from atlas_mcp.tools.base import Tool
@@ -65,6 +68,7 @@ class AtlasServer:
 
         self.metrics = MetricsRegistry()
         self.approvals = ApprovalGate(InMemoryApprovalStore())
+        self.audit = AuditLogger(settings.audit_log_path)
 
         self._register_mcp_handlers()
 
@@ -118,7 +122,11 @@ class AtlasServer:
 
         # Rate limit only after policy passes, so denied calls never burn quota.
         if self.settings.rate_limit_enabled:
-            await self.rate_limiter.acquire(envelope.tenant, tool.meta.name)
+            try:
+                await self.rate_limiter.acquire(envelope.tenant, tool.meta.name)
+            except RateLimitError:
+                self.metrics.observe_rate_limited(tool.meta.name)
+                raise
 
         # High-risk (destructive) tools require a human approval before running.
         if tool.meta.destructive and self.settings.destructive_tool_requires_approval:
@@ -139,19 +147,53 @@ class AtlasServer:
             },
         )
 
-        # Cache sits after rate limit and before the breaker, so a warm cache
-        # keeps serving reads while a downstream backend is in an outage.
-        if self.settings.cache_enabled and tool.cacheable:
-            key = tool.cache_key(envelope.tenant, validated_args)
+        return await self._run_observed(tool, envelope, validated_args)
 
-            async def _compute() -> dict:
-                return await self._execute_reliably(tool, envelope, validated_args)
+    async def _run_observed(
+        self, tool: Tool, envelope: ToolCallEnvelope, validated_args: BaseModel
+    ) -> dict:
+        """Execute (through cache + reliability) while emitting metrics and audit."""
+        started = time.perf_counter()
+        status = "ok"
+        error_code: str | None = None
+        try:
+            # Cache sits after rate limit and before the breaker, so a warm
+            # cache keeps serving reads while a backend is in an outage.
+            if self.settings.cache_enabled and tool.cacheable:
+                key = tool.cache_key(envelope.tenant, validated_args)
+                hits_before = self.cache.hits
 
-            return await self.cache.get_or_compute(
-                key, _compute, ttl=tool.cache_ttl_seconds
+                async def _compute() -> dict:
+                    return await self._execute_reliably(tool, envelope, validated_args)
+
+                result = await self.cache.get_or_compute(
+                    key, _compute, ttl=tool.cache_ttl_seconds
+                )
+                self.metrics.observe_cache(tool.meta.name, hit=self.cache.hits > hits_before)
+                return result
+            return await self._execute_reliably(tool, envelope, validated_args)
+        except ToolError as exc:
+            status = "error"
+            error_code = exc.code
+            raise
+        finally:
+            duration_ms = (time.perf_counter() - started) * 1000
+            self.metrics.observe_call(tool.meta.name, status, duration_ms / 1000)
+            self.metrics.set_circuit_state(
+                tool.meta.name, self.breakers.for_tool(tool.meta.name).state
             )
-
-        return await self._execute_reliably(tool, envelope, validated_args)
+            if self.settings.audit_enabled:
+                self.audit.record(
+                    trace_id=envelope.trace_id,
+                    tenant=envelope.tenant,
+                    caller=envelope.caller,
+                    delegator=envelope.delegator,
+                    tool=tool.meta.name,
+                    arguments=envelope.arguments,
+                    duration_ms=duration_ms,
+                    status=status,
+                    error_code=error_code,
+                )
 
     async def _execute_reliably(
         self, tool: Tool, envelope: ToolCallEnvelope, validated_args: BaseModel

@@ -22,6 +22,7 @@ htmlcov/
 # Logs
 *.log
 /var/
+/logs/
 
 # OS
 .DS_Store
