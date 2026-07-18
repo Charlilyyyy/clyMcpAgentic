@@ -31,6 +31,7 @@ from atlas_mcp.errors.framework import (
     as_call_tool_result,
     normalise_exception,
 )
+from atlas_mcp.governance.approval import ApprovalGate, InMemoryApprovalStore
 from atlas_mcp.governance.http_allowlist import HttpAllowlist
 from atlas_mcp.observability.metrics import MetricsRegistry
 from atlas_mcp.reliability import ATBA, CircuitBreakerRegistry, ReliabilityMetrics, with_retry
@@ -63,6 +64,7 @@ class AtlasServer:
         self.cache = CacheManager(settings, l2=l2_backend)
 
         self.metrics = MetricsRegistry()
+        self.approvals = ApprovalGate(InMemoryApprovalStore())
 
         self._register_mcp_handlers()
 
@@ -117,6 +119,16 @@ class AtlasServer:
         # Rate limit only after policy passes, so denied calls never burn quota.
         if self.settings.rate_limit_enabled:
             await self.rate_limiter.acquire(envelope.tenant, tool.meta.name)
+
+        # High-risk (destructive) tools require a human approval before running.
+        if tool.meta.destructive and self.settings.destructive_tool_requires_approval:
+            await self.approvals.enforce(
+                tenant=envelope.tenant,
+                caller=envelope.caller,
+                delegator=envelope.delegator,
+                tool=tool.meta.name,
+                arguments=envelope.arguments,
+            )
 
         logger.info(
             "tool_dispatch",
