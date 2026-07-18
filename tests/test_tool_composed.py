@@ -43,9 +43,7 @@ class _FakeESBackend:
 @pytest.mark.asyncio
 async def test_semantic_search_hydrates_from_postgres() -> None:
     vector_tool = VectorSearchTool(
-        backend=_FakeVectorBackend(
-            [{"id": "d1", "score": 0.9, "payload": {"text": "chunk"}}]
-        )
+        backend=_FakeVectorBackend([{"id": "d1", "score": 0.9, "payload": {"text": "chunk"}}])
     )
     postgres_tool = PostgresQueryTool(
         backend=_FakePostgresBackend(
@@ -69,9 +67,7 @@ async def test_semantic_search_without_hydration_returns_previews() -> None:
         )
     )
     tool = SemanticSearchTool(embedder=_StubEmbedder(), vector_tool=vector_tool)
-    args = tool.validate(
-        {"query": "q", "collection": "docs", "hydrate_from_postgres": False}
-    )
+    args = tool.validate({"query": "q", "collection": "docs", "hydrate_from_postgres": False})
     result = await tool.run("acme", args)
     assert result["results"][0]["preview"] == "a preview"
     assert result["results"][0]["metadata"] == {"lang": "en"}
@@ -112,9 +108,7 @@ async def test_hybrid_search_fuses_with_rrf() -> None:
             ]
         )
     )
-    tool = HybridSearchTool(
-        embedder=_StubEmbedder(), es_tool=es_tool, vector_tool=vector_tool
-    )
+    tool = HybridSearchTool(embedder=_StubEmbedder(), es_tool=es_tool, vector_tool=vector_tool)
     args = tool.validate(
         {"query": "shared topic", "es_index": "docs", "vector_collection": "docs", "top_k": 3}
     )

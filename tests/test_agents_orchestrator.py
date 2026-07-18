@@ -53,16 +53,26 @@ def _router(script: dict[str, list]):
 
 @pytest.mark.asyncio
 async def test_happy_path_approved_first_try() -> None:
-    responder = _router({
-        "planner": [{"needs": [{"id": "n1", "description": "orders", "priority": 1}],
-                     "customer_id_required": True, "notes": ""}],
-        "retriever": [
-            {"tool": "customer.build_context", "arguments": {"customer_id": "1234"}},
-            {"done": True, "findings": [{"source": "customer.build_context", "summary": "shipped"}]},
-        ],
-        "synthesizer": ["Your order shipped [S1]."],
-        "critic": [{"verdict": "approve", "issues": []}],
-    })
+    responder = _router(
+        {
+            "planner": [
+                {
+                    "needs": [{"id": "n1", "description": "orders", "priority": 1}],
+                    "customer_id_required": True,
+                    "notes": "",
+                }
+            ],
+            "retriever": [
+                {"tool": "customer.build_context", "arguments": {"customer_id": "1234"}},
+                {
+                    "done": True,
+                    "findings": [{"source": "customer.build_context", "summary": "shipped"}],
+                },
+            ],
+            "synthesizer": ["Your order shipped [S1]."],
+            "critic": [{"verdict": "approve", "issues": []}],
+        }
+    )
     copilot = SupportCopilot(FakeMCPClient(), llm=FakeLLM(responder=responder))
     resp = await copilot.answer("Where is order for CUST-1234?")
 
@@ -74,10 +84,14 @@ async def test_happy_path_approved_first_try() -> None:
 
 @pytest.mark.asyncio
 async def test_missing_customer_id_short_circuits_before_retrieval() -> None:
-    responder = _router({
-        "planner": [{"needs": [], "customer_id_required": True, "notes": "need id"}],
-        "retriever": [], "synthesizer": [], "critic": [],
-    })
+    responder = _router(
+        {
+            "planner": [{"needs": [], "customer_id_required": True, "notes": "need id"}],
+            "retriever": [],
+            "synthesizer": [],
+            "critic": [],
+        }
+    )
     mcp = FakeMCPClient()
     copilot = SupportCopilot(mcp, llm=FakeLLM(responder=responder))
     resp = await copilot.answer("Where is my order?")
@@ -89,18 +103,29 @@ async def test_missing_customer_id_short_circuits_before_retrieval() -> None:
 
 @pytest.mark.asyncio
 async def test_critic_revision_loop_runs_once() -> None:
-    responder = _router({
-        "planner": [{"needs": [{"id": "n1", "description": "x", "priority": 1}],
-                     "customer_id_required": False, "notes": ""}],
-        "retriever": [
-            {"done": True, "findings": [{"source": "hybrid_search", "summary": "policy doc"}]},
-        ],
-        "synthesizer": ["You'll get a refund.", "This may require approval [S1]."],
-        "critic": [
-            {"verdict": "revise", "issues": ["unapproved refund"], "revision_hints": "add approval note"},
-            {"verdict": "approve", "issues": []},
-        ],
-    })
+    responder = _router(
+        {
+            "planner": [
+                {
+                    "needs": [{"id": "n1", "description": "x", "priority": 1}],
+                    "customer_id_required": False,
+                    "notes": "",
+                }
+            ],
+            "retriever": [
+                {"done": True, "findings": [{"source": "hybrid_search", "summary": "policy doc"}]},
+            ],
+            "synthesizer": ["You'll get a refund.", "This may require approval [S1]."],
+            "critic": [
+                {
+                    "verdict": "revise",
+                    "issues": ["unapproved refund"],
+                    "revision_hints": "add approval note",
+                },
+                {"verdict": "approve", "issues": []},
+            ],
+        }
+    )
     copilot = SupportCopilot(FakeMCPClient(), llm=FakeLLM(responder=responder))
     resp = await copilot.answer("Refund for my order please")
 
@@ -112,11 +137,14 @@ async def test_critic_revision_loop_runs_once() -> None:
 
 @pytest.mark.asyncio
 async def test_no_findings_short_circuits() -> None:
-    responder = _router({
-        "planner": [{"needs": [], "customer_id_required": False, "notes": ""}],
-        "retriever": [{"done": True, "findings": []}],
-        "synthesizer": [], "critic": [],
-    })
+    responder = _router(
+        {
+            "planner": [{"needs": [], "customer_id_required": False, "notes": ""}],
+            "retriever": [{"done": True, "findings": []}],
+            "synthesizer": [],
+            "critic": [],
+        }
+    )
     copilot = SupportCopilot(FakeMCPClient(), llm=FakeLLM(responder=responder))
     resp = await copilot.answer("anything?")
     assert "relevant information" in resp.draft.lower()

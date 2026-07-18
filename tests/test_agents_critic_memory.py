@@ -46,7 +46,9 @@ class FakeRedis:
 async def test_critic_approves_clean_draft() -> None:
     llm = FakeLLM(responses=[{"verdict": "approve", "issues": []}])
     verdict = await CriticAgent(llm).act(
-        AgentRun(), question="q", findings=[Finding("orders", "shipped")],
+        AgentRun(),
+        question="q",
+        findings=[Finding("orders", "shipped")],
         draft=Draft(text="shipped [S1]", citations=["[S1]"]),
     )
     assert verdict.approved is True
@@ -55,13 +57,19 @@ async def test_critic_approves_clean_draft() -> None:
 
 @pytest.mark.asyncio
 async def test_critic_flags_unsupported_refund_promise() -> None:
-    llm = FakeLLM(responses=[{
-        "verdict": "revise",
-        "issues": ["promises refund without approval"],
-        "revision_hints": "remove the refund promise",
-    }])
+    llm = FakeLLM(
+        responses=[
+            {
+                "verdict": "revise",
+                "issues": ["promises refund without approval"],
+                "revision_hints": "remove the refund promise",
+            }
+        ]
+    )
     verdict = await CriticAgent(llm).act(
-        AgentRun(), question="refund?", findings=[],
+        AgentRun(),
+        question="refund?",
+        findings=[],
         draft=Draft(text="You'll get a refund.", citations=[]),
     )
     assert verdict.approved is False

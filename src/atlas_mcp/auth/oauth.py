@@ -109,7 +109,9 @@ def get_validator(settings: ServerSettings) -> TokenValidator:
 async def discover_authorization_server(issuer_url: str) -> dict:
     """Fetch RFC 8414 authorization server metadata."""
     async with httpx.AsyncClient(timeout=5.0) as client:
-        response = await client.get(f"{issuer_url.rstrip('/')}/.well-known/oauth-authorization-server")
+        response = await client.get(
+            f"{issuer_url.rstrip('/')}/.well-known/oauth-authorization-server"
+        )
         response.raise_for_status()
         return response.json()
 

@@ -33,16 +33,34 @@ def test_hash_is_stable_and_order_independent() -> None:
 def test_query_answers_who_called_what_for_tenant(tmp_path) -> None:
     audit = AuditLogger(str(tmp_path / "audit.jsonl"))
     audit.record(
-        trace_id=None, tenant="acme", caller="agent:1", delegator=None,
-        tool="postgres.query", arguments={}, duration_ms=1, status="ok",
+        trace_id=None,
+        tenant="acme",
+        caller="agent:1",
+        delegator=None,
+        tool="postgres.query",
+        arguments={},
+        duration_ms=1,
+        status="ok",
     )
     audit.record(
-        trace_id=None, tenant="globex", caller="agent:2", delegator=None,
-        tool="postgres.query", arguments={}, duration_ms=1, status="ok",
+        trace_id=None,
+        tenant="globex",
+        caller="agent:2",
+        delegator=None,
+        tool="postgres.query",
+        arguments={},
+        duration_ms=1,
+        status="ok",
     )
     audit.record(
-        trace_id=None, tenant="acme", caller="agent:3", delegator=None,
-        tool="s3.get_object", arguments={}, duration_ms=1, status="error",
+        trace_id=None,
+        tenant="acme",
+        caller="agent:3",
+        delegator=None,
+        tool="s3.get_object",
+        arguments={},
+        duration_ms=1,
+        status="error",
         error_code="not_found",
     )
 

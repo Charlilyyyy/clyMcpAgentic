@@ -33,8 +33,12 @@ class FakeMCPClient:
 
 
 def _plan():
-    return Plan(needs=[PlanStep("n1", "orders", 1)], customer_id_required=False,
-                notes="", customer_id="1234")
+    return Plan(
+        needs=[PlanStep("n1", "orders", 1)],
+        customer_id_required=False,
+        notes="",
+        customer_id="1234",
+    )
 
 
 @pytest.mark.asyncio
@@ -48,7 +52,9 @@ async def test_retriever_calls_tool_then_finishes() -> None:
         return {"done": True, "findings": [{"source": "customer.build_context", "summary": "ok"}]}
 
     llm = FakeLLM(responder=responder)
-    mcp = FakeMCPClient(results={"customer.build_context": ToolResult(ok=True, value={"name": "Acme"})})
+    mcp = FakeMCPClient(
+        results={"customer.build_context": ToolResult(ok=True, value={"name": "Acme"})}
+    )
     run = AgentRun()
     result = await RetrieverAgent(llm, mcp, max_iterations=6).act(run, plan=_plan(), question="q")
 
@@ -91,15 +97,26 @@ async def test_mcp_client_parses_success_and_error() -> None:
         body = json.loads(request.content)
         args = body["params"].get("arguments", {})
         if args.get("fail"):
-            return httpx.Response(200, json={
-                "jsonrpc": "2.0", "id": body["id"],
-                "error": {"code": -32001, "message": "boom",
-                          "data": {"code": "upstream_error", "retryable": True, "hint": "try later"}},
-            })
-        return httpx.Response(200, json={
-            "jsonrpc": "2.0", "id": body["id"],
-            "result": {"content": [{"type": "text", "text": json.dumps({"rows": [1]})}]},
-        })
+            return httpx.Response(
+                200,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": body["id"],
+                    "error": {
+                        "code": -32001,
+                        "message": "boom",
+                        "data": {"code": "upstream_error", "retryable": True, "hint": "try later"},
+                    },
+                },
+            )
+        return httpx.Response(
+            200,
+            json={
+                "jsonrpc": "2.0",
+                "id": body["id"],
+                "result": {"content": [{"type": "text", "text": json.dumps({"rows": [1]})}]},
+            },
+        )
 
     client = AtlasMCPClient("http://atlas", "tok", tenant="acme")
     client._client = httpx.AsyncClient(

@@ -41,4 +41,7 @@ def _as_response(item: Any) -> dict:
         text = json.dumps(item)
     else:
         text = str(item)
-    return {"content": [{"type": "text", "text": text}], "usage": {"input_tokens": 5, "output_tokens": 7}}
+    return {
+        "content": [{"type": "text", "text": text}],
+        "usage": {"input_tokens": 5, "output_tokens": 7},
+    }

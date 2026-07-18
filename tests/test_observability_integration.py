@@ -58,8 +58,8 @@ async def test_dispatch_records_metrics_and_audit(tmp_path) -> None:
 
     with _active_context():
         envelope = _ctx().build_envelope("echo.read", {"q": "hi"})
-        await server.dispatch(envelope)   # miss → executes
-        await server.dispatch(envelope)   # hit → cached
+        await server.dispatch(envelope)  # miss → executes
+        await server.dispatch(envelope)  # hit → cached
 
     rendered = server.metrics.render().decode()
     assert 'atlas_tool_calls_total{status="ok",tool="echo.read"} 2.0' in rendered

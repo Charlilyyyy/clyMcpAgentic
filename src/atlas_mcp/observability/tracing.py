@@ -33,9 +33,7 @@ def build_tracer_provider(
     settings: ServerSettings, processor: SpanProcessor | None = None
 ) -> TracerProvider:
     """Create a provider. Tests inject an in-memory processor; prod uses OTLP."""
-    resource = Resource.create(
-        {"service.name": settings.service_name, "service.version": "0.1.0"}
-    )
+    resource = Resource.create({"service.name": settings.service_name, "service.version": "0.1.0"})
     provider = TracerProvider(resource=resource)
     if processor is None:
         from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter

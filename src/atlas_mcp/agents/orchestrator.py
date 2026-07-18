@@ -90,7 +90,9 @@ class SupportCopilot:
         self.llm = llm or LLM()
         self.mcp = mcp_client
         self.planner = PlannerAgent(self.llm)
-        self.retriever = RetrieverAgent(self.llm, mcp_client, max_iterations=max_retriever_iterations)
+        self.retriever = RetrieverAgent(
+            self.llm, mcp_client, max_iterations=max_retriever_iterations
+        )
         self.synthesizer = SynthesizerAgent(self.llm)
         self.critic = CriticAgent(self.llm)
 
@@ -100,23 +102,34 @@ class SupportCopilot:
 
         # 1. Plan.
         plan = await self.planner.act(run, question=question)
-        log.info("plan_ready", run_id=run.run_id, needs=len(plan.needs),
-                 customer_id=plan.customer_id)
+        log.info(
+            "plan_ready", run_id=run.run_id, needs=len(plan.needs), customer_id=plan.customer_id
+        )
 
         if plan.customer_id_required and not plan.customer_id:
-            return self._short_circuit(run, plan,
+            return self._short_circuit(
+                run,
+                plan,
                 "I couldn't find a customer id in that question. "
-                "Please include it (e.g. CUST-1234) and I'll try again.")
+                "Please include it (e.g. CUST-1234) and I'll try again.",
+            )
 
         # 2. Retrieve.
         retrieval = await self.retriever.act(run, plan=plan, question=question)
-        log.info("retrieval_done", run_id=run.run_id,
-                 findings=len(retrieval.findings), iterations=retrieval.iterations_used)
+        log.info(
+            "retrieval_done",
+            run_id=run.run_id,
+            findings=len(retrieval.findings),
+            iterations=retrieval.iterations_used,
+        )
 
         if not retrieval.findings:
-            return self._short_circuit(run, plan,
+            return self._short_circuit(
+                run,
+                plan,
                 "I wasn't able to find any relevant information in our systems. "
-                "Please double-check the customer id and question.")
+                "Please double-check the customer id and question.",
+            )
 
         # 3. Synthesize + critique with one revise loop.
         draft = await self.synthesizer.act(run, question=question, findings=retrieval.findings)

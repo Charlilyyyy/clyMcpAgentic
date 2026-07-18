@@ -27,14 +27,16 @@ from atlas_mcp.agents.prompts import RETRIEVER_SYSTEM
 # Tools the retriever is allowed to call. Read-only + composed/workflow
 # retrievers. Enforced client-side as a second layer on top of the server's
 # policy engine.
-_ALLOWED_TOOLS = frozenset({
-    "customer.build_context",
-    "semantic_search",
-    "hybrid_search",
-    "postgres.query",
-    "elasticsearch.search",
-    "vector.search",
-})
+_ALLOWED_TOOLS = frozenset(
+    {
+        "customer.build_context",
+        "semantic_search",
+        "hybrid_search",
+        "postgres.query",
+        "elasticsearch.search",
+        "vector.search",
+    }
+)
 
 
 @dataclass
@@ -62,10 +64,12 @@ class RetrieverAgent(Agent):
 
     async def act(self, run: AgentRun, *, plan, question: str) -> RetrievalResult:  # type: ignore[override]
         tool_specs = await self._fetch_tool_specs()
-        messages: list[dict] = [{
-            "role": "user",
-            "content": self._build_initial_prompt(question, plan, tool_specs),
-        }]
+        messages: list[dict] = [
+            {
+                "role": "user",
+                "content": self._build_initial_prompt(question, plan, tool_specs),
+            }
+        ]
         result = RetrievalResult()
         findings_accum: list[Finding] = []
 
@@ -75,45 +79,54 @@ class RetrieverAgent(Agent):
 
             if decision.get("done"):
                 for f in decision.get("findings", []):
-                    findings_accum.append(Finding(
-                        source=str(f.get("source", "")),
-                        summary=str(f.get("summary", "")),
-                    ))
+                    findings_accum.append(
+                        Finding(
+                            source=str(f.get("source", "")),
+                            summary=str(f.get("summary", "")),
+                        )
+                    )
                 break
 
             tool_name = decision.get("tool")
             arguments = decision.get("arguments") or {}
             if not tool_name:
                 messages.append({"role": "assistant", "content": json.dumps(decision)})
-                messages.append({
-                    "role": "user",
-                    "content": "Your last response had no `tool` and no `done`. "
-                               "Emit {\"done\": true, \"findings\": [...]} if you have enough, "
-                               "otherwise {\"tool\": \"<name>\", \"arguments\": {...}}."
-                })
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": "Your last response had no `tool` and no `done`. "
+                        'Emit {"done": true, "findings": [...]} if you have enough, '
+                        'otherwise {"tool": "<name>", "arguments": {...}}.',
+                    }
+                )
                 continue
 
             if tool_name not in _ALLOWED_TOOLS:
                 observation = ToolResult(
-                    ok=False, error_code="tool_not_allowed", retryable=False,
+                    ok=False,
+                    error_code="tool_not_allowed",
+                    retryable=False,
                     hint=f"{tool_name!r} is not in the retriever's allow-list",
                 ).as_agent_observation()
             else:
                 run.tool_calls += 1
                 tool_result = await self.mcp.call_tool(tool_name, arguments)
-                findings_accum.append(Finding(
-                    source=tool_name,
-                    summary=_summarise_result(tool_result, max_chars=500),
-                    raw=tool_result.value,
-                ))
+                findings_accum.append(
+                    Finding(
+                        source=tool_name,
+                        summary=_summarise_result(tool_result, max_chars=500),
+                        raw=tool_result.value,
+                    )
+                )
                 observation = tool_result.as_agent_observation()
 
             messages.append({"role": "assistant", "content": json.dumps(decision)})
-            messages.append({
-                "role": "user",
-                "content": f"Tool `{tool_name}` result:\n{observation}\n\n"
-                           f"Decide next step.",
-            })
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"Tool `{tool_name}` result:\n{observation}\n\nDecide next step.",
+                }
+            )
         else:
             result.exceeded_budget = True
 
@@ -143,9 +156,9 @@ class RetrieverAgent(Agent):
         lines.append("")
         lines.append(
             "Respond with EITHER "
-            "{\"tool\": \"<name>\", \"arguments\": {...}} "
+            '{"tool": "<name>", "arguments": {...}} '
             "to call a tool, OR "
-            "{\"done\": true, \"findings\": [{\"source\": \"<tool>\", \"summary\": \"...\"}]} "
+            '{"done": true, "findings": [{"source": "<tool>", "summary": "..."}]} '
             "when you have enough information."
         )
         return "\n".join(lines)

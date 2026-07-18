@@ -30,9 +30,7 @@ class Plan:
     customer_id: str | None = None
 
 
-_CUSTOMER_ID_RE = re.compile(
-    r"\b(?:cust|customer|account|acct)[_-]?([A-Za-z0-9\-_]{3,64})\b", re.I
-)
+_CUSTOMER_ID_RE = re.compile(r"\b(?:cust|customer|account|acct)[_-]?([A-Za-z0-9\-_]{3,64})\b", re.I)
 
 
 class PlannerAgent(Agent):

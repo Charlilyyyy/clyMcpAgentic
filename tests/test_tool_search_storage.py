@@ -45,9 +45,13 @@ class _FakeStore:
 @pytest.mark.asyncio
 async def test_es_injects_mandatory_tenant_filter() -> None:
     backend = _FakeES(
-        response={"hits": {"total": {"value": 1}, "hits": [
-            {"_id": "t1", "_score": 1.2, "_source": {"subject": "hi"}}
-        ]}, "took": 3}
+        response={
+            "hits": {
+                "total": {"value": 1},
+                "hits": [{"_id": "t1", "_score": 1.2, "_source": {"subject": "hi"}}],
+            },
+            "took": 3,
+        }
     )
     tool = ElasticsearchSearchTool(backend=backend)
     args = tool.validate({"index": "tickets", "query": {"match_all": {}}, "size": 5})

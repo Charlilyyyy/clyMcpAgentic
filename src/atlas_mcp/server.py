@@ -166,9 +166,7 @@ class AtlasServer:
                 async def _compute() -> dict:
                     return await self._execute_reliably(tool, envelope, validated_args)
 
-                result = await self.cache.get_or_compute(
-                    key, _compute, ttl=tool.cache_ttl_seconds
-                )
+                result = await self.cache.get_or_compute(key, _compute, ttl=tool.cache_ttl_seconds)
                 self.metrics.observe_cache(tool.meta.name, hit=self.cache.hits > hits_before)
                 return result
             return await self._execute_reliably(tool, envelope, validated_args)

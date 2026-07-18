@@ -24,7 +24,9 @@ class EmbeddingClient:
         model: str = "text-embedding-3-small",
         transport: Any = None,
     ) -> None:
-        self.base_url = base_url or os.environ.get("ATLAS_EMBEDDING_URL", "https://api.openai.com/v1")
+        self.base_url = base_url or os.environ.get(
+            "ATLAS_EMBEDDING_URL", "https://api.openai.com/v1"
+        )
         self.api_key = api_key or os.environ.get("ATLAS_EMBEDDING_KEY", "")
         self.model = model
         self._transport = transport  # injectable httpx transport for tests

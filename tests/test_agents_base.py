@@ -12,7 +12,7 @@ def test_parse_json_plain() -> None:
 
 
 def test_parse_json_with_markdown_fence() -> None:
-    text = "```json\n{\"a\": 1}\n```"
+    text = '```json\n{"a": 1}\n```'
     assert parse_json_lenient(text) == {"a": 1}
 
 

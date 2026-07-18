@@ -31,10 +31,7 @@ class AgentRun:
 
 
 class LLMProtocol(Protocol):
-    async def complete(
-        self, system: str, messages: list[dict], max_tokens: int = 1024
-    ) -> dict:
-        ...
+    async def complete(self, system: str, messages: list[dict], max_tokens: int = 1024) -> dict: ...
 
 
 class LLM:
@@ -45,9 +42,7 @@ class LLM:
         self.model = model
         self.base_url = "https://api.anthropic.com/v1"
 
-    async def complete(
-        self, system: str, messages: list[dict], max_tokens: int = 1024
-    ) -> dict:
+    async def complete(self, system: str, messages: list[dict], max_tokens: int = 1024) -> dict:
         import httpx
 
         body: dict[str, Any] = {
@@ -77,8 +72,7 @@ class Agent(ABC):
         self.llm = llm
 
     @abstractmethod
-    async def act(self, run: AgentRun, **inputs: Any) -> Any:
-        ...
+    async def act(self, run: AgentRun, **inputs: Any) -> Any: ...
 
     async def _complete_json(
         self, run: AgentRun, messages: list[dict], max_tokens: int = 512

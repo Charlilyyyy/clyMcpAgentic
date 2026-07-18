@@ -110,9 +110,7 @@ class ToolRegistry:
             "tools_summary": [self._tool_summary(tool) for tool in self._tools.values()],
             "authorization_server": {
                 "issuer": settings.auth_issuer,
-                "metadata_url": (
-                    f"{settings.auth_issuer}/.well-known/oauth-authorization-server"
-                ),
+                "metadata_url": (f"{settings.auth_issuer}/.well-known/oauth-authorization-server"),
             },
         }
 

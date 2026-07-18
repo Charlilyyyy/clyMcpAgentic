@@ -18,8 +18,15 @@ from atlas_mcp.agents.synthesizer import SynthesizerAgent  # noqa: E402
 
 @pytest.mark.asyncio
 async def test_planner_extracts_customer_id_in_code() -> None:
-    llm = FakeLLM(responses=[{"needs": [{"id": "n1", "description": "orders", "priority": 1}],
-                              "customer_id_required": False, "notes": ""}])
+    llm = FakeLLM(
+        responses=[
+            {
+                "needs": [{"id": "n1", "description": "orders", "priority": 1}],
+                "customer_id_required": False,
+                "notes": "",
+            }
+        ]
+    )
     plan = await PlannerAgent(llm).act(AgentRun(), question="Refund for CUST-1234 please?")
     assert plan.customer_id == "1234"
     assert plan.needs[0].id == "n1"

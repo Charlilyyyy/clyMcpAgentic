@@ -62,9 +62,7 @@ async def test_refill_restores_tokens_over_time() -> None:
     denied, retry = await backend.consume("k", capacity=2, refill_per_s=1.0, cost=1, now_ms=0)
     assert denied == 0 and retry > 0
     # 1.5s later ~1.5 tokens have refilled → one more consume allowed.
-    allowed_again, _ = await backend.consume(
-        "k", capacity=2, refill_per_s=1.0, cost=1, now_ms=1500
-    )
+    allowed_again, _ = await backend.consume("k", capacity=2, refill_per_s=1.0, cost=1, now_ms=1500)
     assert allowed_again == 1
 
 

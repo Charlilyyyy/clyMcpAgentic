@@ -65,9 +65,7 @@ class AtlasMCPClient:
         }
         if self.tenant:
             headers["X-Tenant-Id"] = self.tenant
-        self._client = httpx.AsyncClient(
-            base_url=self.base_url, headers=headers, timeout=30.0
-        )
+        self._client = httpx.AsyncClient(base_url=self.base_url, headers=headers, timeout=30.0)
         await self._initialize()
         return self
 
@@ -94,9 +92,7 @@ class AtlasMCPClient:
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> ToolResult:
         try:
-            resp = await self._rpc(
-                "tools/call", {"name": name, "arguments": arguments}
-            )
+            resp = await self._rpc("tools/call", {"name": name, "arguments": arguments})
         except MCPError as exc:
             data = exc.data or {}
             return ToolResult(
@@ -132,8 +128,9 @@ class AtlasMCPClient:
         body = resp.json()
         if "error" in body:
             err = body["error"]
-            raise MCPError(code=err.get("code", -32000), message=err.get("message", ""),
-                           data=err.get("data"))
+            raise MCPError(
+                code=err.get("code", -32000), message=err.get("message", ""), data=err.get("data")
+            )
         return body.get("result", {})
 
 

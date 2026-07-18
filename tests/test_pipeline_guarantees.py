@@ -86,9 +86,7 @@ async def test_invalid_payload_rejected_before_policy(server: AtlasServer) -> No
 @pytest.mark.asyncio
 async def test_unknown_fields_rejected_before_policy(server: AtlasServer) -> None:
     tracking = _TrackingPolicy(
-        rules=[
-            Rule(id="allow-ping", subjects=("*",), actions=("server.ping",), resources=("*",))
-        ]
+        rules=[Rule(id="allow-ping", subjects=("*",), actions=("server.ping",), resources=("*",))]
     )
     server.policy = tracking
 
@@ -107,9 +105,7 @@ async def test_unknown_fields_rejected_before_policy(server: AtlasServer) -> Non
 @pytest.mark.asyncio
 async def test_valid_call_reaches_policy_then_executes(server: AtlasServer) -> None:
     tracking = _TrackingPolicy(
-        rules=[
-            Rule(id="allow-ping", subjects=("*",), actions=("server.ping",), resources=("*",))
-        ]
+        rules=[Rule(id="allow-ping", subjects=("*",), actions=("server.ping",), resources=("*",))]
     )
     server.policy = tracking
     result = await server.dispatch(
@@ -126,7 +122,9 @@ async def test_valid_call_reaches_policy_then_executes(server: AtlasServer) -> N
 
 @pytest.mark.asyncio
 async def test_tool_list_reflects_dynamic_registration(server: AtlasServer) -> None:
-    before = {t.name for t in server.registry.list_visible(tenant="acme", scopes=["tool:demo:read"])}
+    before = {
+        t.name for t in server.registry.list_visible(tenant="acme", scopes=["tool:demo:read"])
+    }
     assert "demo.echo" not in before
 
     server.registry.register(_EchoTool())
@@ -143,7 +141,9 @@ async def test_tool_list_reflects_dynamic_registration(server: AtlasServer) -> N
     assert "demo.echo" not in {
         t.name for t in server.registry.list_visible(tenant="acme", scopes=["tool:demo:read"])
     }
-    assert not any(e["name"] == "demo.echo" for e in server.registry.capability_document()["tools_summary"])
+    assert not any(
+        e["name"] == "demo.echo" for e in server.registry.capability_document()["tools_summary"]
+    )
 
 
 @pytest.mark.asyncio

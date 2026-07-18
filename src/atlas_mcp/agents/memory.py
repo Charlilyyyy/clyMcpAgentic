@@ -44,7 +44,7 @@ class ShortTermMemory:
     """Per-session conversation buffer stored in Redis."""
 
     TTL_SECONDS = 3600  # Sessions expire after an hour of inactivity.
-    MAX_TURNS = 20      # Trim to the most recent 20 turns.
+    MAX_TURNS = 20  # Trim to the most recent 20 turns.
 
     def __init__(self, redis: RedisLike):
         self._redis = redis

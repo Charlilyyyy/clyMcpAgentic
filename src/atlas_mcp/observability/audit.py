@@ -73,9 +73,7 @@ class AuditLogger:
         with self.path.open("r", encoding="utf-8") as fh:
             return [json.loads(line) for line in fh if line.strip()]
 
-    def query(
-        self, *, tenant: str | None = None, tool: str | None = None
-    ) -> list[dict[str, Any]]:
+    def query(self, *, tenant: str | None = None, tool: str | None = None) -> list[dict[str, Any]]:
         """Answer 'who called what tool for tenant X?' style questions."""
         events = self.read_all()
         if tenant is not None:

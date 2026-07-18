@@ -45,6 +45,7 @@ def _server(tool: Tool, *, allow_policy: bool = True, **settings_kwargs) -> Atla
     if allow_policy:
         server.policy.check = lambda **kwargs: None  # type: ignore[method-assign]
     else:
+
         def _deny(**kwargs):
             raise PolicyError("denied", retryable=False, hint="no")
 

@@ -56,7 +56,9 @@ async def test_embeddings_client_parses_response() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"data": [{"embedding": [0.1, 0.2, 0.3]}]})
 
-    client = EmbeddingClient(base_url="https://embed.local/v1", transport=httpx.MockTransport(handler))
+    client = EmbeddingClient(
+        base_url="https://embed.local/v1", transport=httpx.MockTransport(handler)
+    )
     vectors = await client.embed(["hello"])
     assert vectors == [[0.1, 0.2, 0.3]]
 
@@ -66,7 +68,9 @@ async def test_embeddings_client_maps_http_error() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(503, text="unavailable")
 
-    client = EmbeddingClient(base_url="https://embed.local/v1", transport=httpx.MockTransport(handler))
+    client = EmbeddingClient(
+        base_url="https://embed.local/v1", transport=httpx.MockTransport(handler)
+    )
     with pytest.raises(UpstreamError) as exc_info:
         await client.embed(["hello"])
     assert exc_info.value.retryable is True

@@ -22,8 +22,18 @@ from atlas_mcp.tools.base import Tool, ToolLevel, ToolMetadata
 from atlas_mcp.validation.adversarial import StrictToolModel
 
 _FORBIDDEN_KEYWORDS = (
-    "INSERT", "UPDATE", "DELETE", "DROP", "TRUNCATE", "ALTER",
-    "CREATE", "GRANT", "REVOKE", "COPY", "CALL", "EXECUTE",
+    "INSERT",
+    "UPDATE",
+    "DELETE",
+    "DROP",
+    "TRUNCATE",
+    "ALTER",
+    "CREATE",
+    "GRANT",
+    "REVOKE",
+    "COPY",
+    "CALL",
+    "EXECUTE",
 )
 
 

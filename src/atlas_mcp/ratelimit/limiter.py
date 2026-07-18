@@ -28,7 +28,7 @@ from atlas_mcp.errors.framework import RateLimitError
 
 @dataclass(frozen=True, slots=True)
 class Quota:
-    capacity: int          # Maximum tokens in the bucket (burst size).
+    capacity: int  # Maximum tokens in the bucket (burst size).
     refill_per_minute: int  # Tokens replenished per minute (sustained rate).
 
 

@@ -32,24 +32,20 @@ class ElasticsearchBackend(Protocol):
 
 @runtime_checkable
 class ObjectStoreBackend(Protocol):
-    async def get_object(self, bucket: str, key: str, max_bytes: int) -> bytes:
-        ...
+    async def get_object(self, bucket: str, key: str, max_bytes: int) -> bytes: ...
 
     async def put_object(
         self, bucket: str, key: str, body: bytes, content_type: str, metadata: dict[str, str]
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
 @runtime_checkable
 class VectorBackend(Protocol):
     async def search(
         self, collection: str, vector: list[float], top_k: int, query_filter: dict[str, Any]
-    ) -> list[dict[str, Any]]:
-        ...
+    ) -> list[dict[str, Any]]: ...
 
 
 @runtime_checkable
 class Embedder(Protocol):
-    async def embed(self, texts: list[str]) -> list[list[float]]:
-        ...
+    async def embed(self, texts: list[str]) -> list[list[float]]: ...

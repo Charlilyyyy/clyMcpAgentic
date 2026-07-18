@@ -62,9 +62,7 @@ class HTTPFetchTool(Tool):
     )
     input_schema: ClassVar[type[StrictToolModel]] = HTTPFetchInput
 
-    def __init__(
-        self, allowlist: HttpAllowlist | None = None, transport: Any = None
-    ) -> None:
+    def __init__(self, allowlist: HttpAllowlist | None = None, transport: Any = None) -> None:
         self._allowlist = allowlist
         self._transport = transport  # injectable httpx transport for tests
 

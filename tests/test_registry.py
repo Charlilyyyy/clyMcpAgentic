@@ -132,4 +132,6 @@ async def test_unregister_updates_capability_document() -> None:
     registry.unregister("demo.scoped")
 
     assert "demo.scoped" not in registry
-    assert registry.capability_document()["capabilities"]["tools"]["count"] == len(BUILTIN_TOOL_NAMES)
+    assert registry.capability_document()["capabilities"]["tools"]["count"] == len(
+        BUILTIN_TOOL_NAMES
+    )

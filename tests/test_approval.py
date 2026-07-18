@@ -46,8 +46,9 @@ class _WriteTool(Tool):
 @pytest.mark.asyncio
 async def test_gate_creates_pending_then_allows_after_approval() -> None:
     gate = ApprovalGate(InMemoryApprovalStore())
-    kwargs = dict(tenant="acme", caller="agent", delegator="human", tool="demo.write",
-                  arguments={"key": "a"})
+    kwargs = dict(
+        tenant="acme", caller="agent", delegator="human", tool="demo.write", arguments={"key": "a"}
+    )
 
     with pytest.raises(PendingApprovalError) as exc_info:
         await gate.enforce(**kwargs)
@@ -65,8 +66,9 @@ async def test_gate_creates_pending_then_allows_after_approval() -> None:
 @pytest.mark.asyncio
 async def test_gate_denied_raises_policy_error() -> None:
     gate = ApprovalGate(InMemoryApprovalStore())
-    kwargs = dict(tenant="acme", caller="agent", delegator=None, tool="demo.write",
-                  arguments={"key": "a"})
+    kwargs = dict(
+        tenant="acme", caller="agent", delegator=None, tool="demo.write", arguments={"key": "a"}
+    )
     with pytest.raises(PendingApprovalError) as exc_info:
         await gate.enforce(**kwargs)
     await gate.deny(exc_info.value.context["approval_id"], approver="ops:bob")

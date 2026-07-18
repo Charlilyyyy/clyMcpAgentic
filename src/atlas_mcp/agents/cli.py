@@ -45,7 +45,7 @@ async def _main(question: str) -> int:
 
 def main() -> None:
     if len(sys.argv) < 2:
-        print("usage: atlas-copilot \"<customer question>\"", file=sys.stderr)
+        print('usage: atlas-copilot "<customer question>"', file=sys.stderr)
         sys.exit(2)
     question = " ".join(sys.argv[1:])
     sys.exit(asyncio.run(_main(question)))
