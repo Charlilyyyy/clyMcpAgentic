@@ -5,9 +5,11 @@ from atlas_mcp.reliability.circuit_breaker import (
     CircuitBreakerRegistry,
     State,
 )
+from atlas_mcp.reliability.retry import with_retry
 
 __all__ = [
     "CircuitBreaker",
     "CircuitBreakerRegistry",
     "State",
+    "with_retry",
 ]
