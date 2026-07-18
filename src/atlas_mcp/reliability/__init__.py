@@ -6,6 +6,7 @@ from atlas_mcp.reliability.circuit_breaker import (
     CircuitBreakerRegistry,
     State,
 )
+from atlas_mcp.reliability.metrics import ReliabilityMetrics
 from atlas_mcp.reliability.retry import with_retry
 
 __all__ = [
@@ -14,6 +15,7 @@ __all__ = [
     "LatencyTracker",
     "CircuitBreaker",
     "CircuitBreakerRegistry",
+    "ReliabilityMetrics",
     "State",
     "with_retry",
 ]

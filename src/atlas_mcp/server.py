@@ -22,9 +22,15 @@ from pydantic import BaseModel
 from atlas_mcp.auth.policy import PolicyEngine
 from atlas_mcp.config import ServerSettings, get_settings
 from atlas_mcp.context import current_context
-from atlas_mcp.errors.framework import PolicyError, ToolError, as_call_tool_result, normalise_exception
+from atlas_mcp.errors.framework import (
+    CircuitOpenError,
+    PolicyError,
+    ToolError,
+    as_call_tool_result,
+    normalise_exception,
+)
 from atlas_mcp.governance.http_allowlist import HttpAllowlist
-from atlas_mcp.reliability import ATBA, CircuitBreakerRegistry, with_retry
+from atlas_mcp.reliability import ATBA, CircuitBreakerRegistry, ReliabilityMetrics, with_retry
 from atlas_mcp.tools.base import Tool
 from atlas_mcp.tools.registry import ToolRegistry
 from atlas_mcp.validation.schemas import ToolCallEnvelope
@@ -46,7 +52,12 @@ class AtlasServer:
         self.http_allowlist = HttpAllowlist.from_file(settings.http_allowlist_file)
         self.breakers = CircuitBreakerRegistry(settings)
         self.atba = ATBA(settings.atba_total_budget_ms)
+        self.reliability_metrics = ReliabilityMetrics()
         self._register_mcp_handlers()
+
+    def reliability_snapshot(self) -> dict:
+        """Current breaker states, trip counts, and retry activity."""
+        return self.reliability_metrics.snapshot(self.breakers)
 
     def _register_mcp_handlers(self) -> None:
         @self.mcp.list_tools()
@@ -114,6 +125,8 @@ class AtlasServer:
         """
         breaker = self.breakers.for_tool(tool.meta.name)
         retryable = not tool.meta.destructive
+        metrics = self.reliability_metrics
+        metrics.record_call(tool.meta.name)
 
         async def _run() -> dict:
             try:
@@ -128,15 +141,28 @@ class AtlasServer:
                 raise normalise_exception(exc, tool=envelope.tool) from exc
 
         async def _guarded() -> dict:
-            if retryable:
+            if not retryable:
+                return await _run()
+            try:
                 return await with_retry(
                     _run,
                     max_attempts=self.settings.retry_max_attempts,
                     base_delay_ms=self.settings.retry_base_delay_ms,
+                    sleep=self._on_retry_sleep,
                 )
-            return await _run()
+            except ToolError:
+                metrics.record_retry_exhausted()
+                raise
 
-        return await self.atba.call_with_budget(tool.meta.name, breaker.call(_guarded))
+        try:
+            return await self.atba.call_with_budget(tool.meta.name, breaker.call(_guarded))
+        except CircuitOpenError:
+            metrics.record_short_circuit()
+            raise
+
+    async def _on_retry_sleep(self, delay: float) -> None:
+        self.reliability_metrics.record_retry()
+        await asyncio.sleep(delay)
 
     async def startup(self) -> None:
         await self.registry.discover()
