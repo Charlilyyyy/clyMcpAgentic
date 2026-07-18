@@ -81,7 +81,10 @@ async def test_http_list_and_call_stub_tool() -> None:
                 async with ClientSession(read_stream, write_stream) as session:
                     await session.initialize()
                     tools = await session.list_tools()
-                    assert [tool.name for tool in tools.tools] == ["server.ping"]
+                    # Dev token carries tool:*:admin, so the full hierarchy is visible.
+                    names = {tool.name for tool in tools.tools}
+                    assert "server.ping" in names
+                    assert "customer.build_context" in names
 
                     result = await session.call_tool(
                         "server.ping",

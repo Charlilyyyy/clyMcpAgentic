@@ -24,8 +24,12 @@ async def server() -> AtlasServer:
 
 
 @pytest.mark.asyncio
-async def test_startup_registers_stub_tool(server: AtlasServer) -> None:
-    assert len(server.registry) == 1
+async def test_startup_registers_tool_hierarchy(server: AtlasServer) -> None:
+    names = {t.meta.name for t in server.registry}
+    assert "server.ping" in names
+    assert "postgres.query" in names
+    assert "customer.build_context" in names
+    assert len(server.registry) >= 10
 
 
 @pytest.mark.asyncio

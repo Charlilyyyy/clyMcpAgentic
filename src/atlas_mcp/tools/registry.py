@@ -48,12 +48,36 @@ class ToolRegistry:
     async def discover(self) -> None:
         """Load built-in tools. Idempotent — a second call is a no-op.
 
-        Third-party entry points can extend this later; until then the
-        registry reflects whatever has been registered via :meth:`register`.
+        Loads the three-level hierarchy: atomic → composed → workflow. In
+        production these would come from setuptools entry points so third
+        parties can plug in tools by installing a package.
         """
         if self._discovered:
             return
+
+        from atlas_mcp.tools.atomic.elasticsearch import ElasticsearchSearchTool
+        from atlas_mcp.tools.atomic.http_client import HTTPFetchTool
+        from atlas_mcp.tools.atomic.postgres import PostgresQueryTool
+        from atlas_mcp.tools.atomic.s3_storage import S3GetTool, S3PutTool
+        from atlas_mcp.tools.atomic.vector_search import VectorSearchTool
+        from atlas_mcp.tools.composed.hybrid_search import HybridSearchTool
+        from atlas_mcp.tools.composed.semantic_search import SemanticSearchTool
+        from atlas_mcp.tools.workflow.customer_context import CustomerContextTool
+
         self.register(StubPingTool())
+        for cls in (
+            PostgresQueryTool,
+            ElasticsearchSearchTool,
+            VectorSearchTool,
+            S3GetTool,
+            S3PutTool,
+            HTTPFetchTool,
+        ):
+            self.register(cls())
+        for cls in (SemanticSearchTool, HybridSearchTool):
+            self.register(cls())
+        self.register(CustomerContextTool())
+
         self._discovered = True
 
     def get(self, name: str) -> Tool:

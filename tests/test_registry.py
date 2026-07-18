@@ -30,13 +30,26 @@ class _ScopedTool(Tool):
         return {"tenant": tenant, "q": args.q}
 
 
+BUILTIN_TOOL_NAMES = {
+    "server.ping",
+    "postgres.query",
+    "elasticsearch.search",
+    "vector.search",
+    "s3.get_object",
+    "s3.put_object",
+    "http.fetch",
+    "semantic_search",
+    "hybrid_search",
+    "customer.build_context",
+}
+
+
 @pytest.mark.asyncio
-async def test_discover_registers_stub_ping() -> None:
+async def test_discover_registers_full_hierarchy() -> None:
     registry = ToolRegistry()
     await registry.discover()
-    assert len(registry) == 1
-    tool = registry.get("server.ping")
-    assert tool.meta.name == "server.ping"
+    assert len(registry) == len(BUILTIN_TOOL_NAMES)
+    assert {t.meta.name for t in registry} == BUILTIN_TOOL_NAMES
     assert "server.ping" in registry
 
 
@@ -45,7 +58,7 @@ async def test_discover_is_idempotent() -> None:
     registry = ToolRegistry()
     await registry.discover()
     await registry.discover()
-    assert len(registry) == 1
+    assert len(registry) == len(BUILTIN_TOOL_NAMES)
 
 
 @pytest.mark.asyncio
@@ -86,10 +99,11 @@ async def test_list_visible_hides_tools_without_required_scopes() -> None:
     assert [t.name for t in visible_without] == ["server.ping"]
 
     visible_with = registry.list_visible(tenant="acme", scopes=["tool:demo:read"])
+    # server.ping (no scope) + demo.scoped (tool:demo:read); other tools need other scopes.
     assert {t.name for t in visible_with} == {"server.ping", "demo.scoped"}
 
     visible_admin = registry.list_visible(tenant="acme", scopes=["tool:*:admin"])
-    assert {t.name for t in visible_admin} == {"server.ping", "demo.scoped"}
+    assert {t.name for t in visible_admin} == BUILTIN_TOOL_NAMES | {"demo.scoped"}
 
 
 @pytest.mark.asyncio
@@ -99,11 +113,11 @@ async def test_capability_document_reflects_live_registrations() -> None:
     registry.register(_ScopedTool())
 
     doc = registry.capability_document()
-    assert doc["capabilities"]["tools"]["count"] == 2
+    assert doc["capabilities"]["tools"]["count"] == len(BUILTIN_TOOL_NAMES) + 1
     assert "atomic" in doc["capabilities"]["tools"]["levels"]
 
     names = {entry["name"] for entry in doc["tools_summary"]}
-    assert names == {"server.ping", "demo.scoped"}
+    assert names == BUILTIN_TOOL_NAMES | {"demo.scoped"}
 
     scoped = next(e for e in doc["tools_summary"] if e["name"] == "demo.scoped")
     assert scoped["scopes_required"] == ["tool:demo:read"]
@@ -118,4 +132,4 @@ async def test_unregister_updates_capability_document() -> None:
     registry.unregister("demo.scoped")
 
     assert "demo.scoped" not in registry
-    assert registry.capability_document()["capabilities"]["tools"]["count"] == 1
+    assert registry.capability_document()["capabilities"]["tools"]["count"] == len(BUILTIN_TOOL_NAMES)
