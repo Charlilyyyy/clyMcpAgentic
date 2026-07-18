@@ -1,0 +1,47 @@
+# Atlas-MCP — non-secret runtime configuration.
+#
+# Anything sensitive (DSNs with passwords, API keys, dev tokens) belongs in
+# the Secret, never here. Mount this as environment via `envFrom`.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: atlas-mcp-config
+  labels:
+    app.kubernetes.io/name: atlas-mcp
+    app.kubernetes.io/component: server
+data:
+  ATLAS_TRANSPORT: "http"
+  ATLAS_HTTP_HOST: "0.0.0.0"
+  ATLAS_HTTP_PORT: "8080"
+  ATLAS_STATELESS_MODE: "true"
+
+  ATLAS_AUTH_ISSUER: "https://auth.atlas.example.com"
+  ATLAS_AUTH_AUDIENCE: "atlas-mcp"
+  ATLAS_AUTH_JWKS_URL: "https://auth.atlas.example.com/.well-known/jwks.json"
+  ATLAS_AUTH_REQUIRE_PKCE: "true"
+
+  ATLAS_POLICY_DEFAULT_DENY: "true"
+  ATLAS_POLICY_FILE: "/app/config/policy.yaml"
+
+  ATLAS_CIRCUIT_BREAKER_FAILURE_THRESHOLD: "5"
+  ATLAS_CIRCUIT_BREAKER_RECOVERY_SECONDS: "30"
+  ATLAS_RETRY_MAX_ATTEMPTS: "3"
+  ATLAS_ATBA_TOTAL_BUDGET_MS: "30000"
+
+  ATLAS_RATE_LIMIT_DEFAULT_RPM: "60"
+  ATLAS_RATE_LIMIT_BURST: "20"
+  ATLAS_REDIS_URL: "redis://atlas-redis:6379/0"
+
+  ATLAS_CACHE_L1_MAX_ITEMS: "10000"
+  ATLAS_CACHE_L1_TTL_SECONDS: "60"
+  ATLAS_CACHE_L2_TTL_SECONDS: "600"
+
+  ATLAS_OTEL_ENDPOINT: "http://otel-collector:4317"
+  ATLAS_SERVICE_NAME: "atlas-mcp"
+  ATLAS_LOG_LEVEL: "INFO"
+  ATLAS_METRICS_ENABLED: "true"
+  ATLAS_AUDIT_LOG_PATH: "/var/log/atlas/audit.jsonl"
+
+  ATLAS_TENANT_HEADER: "X-Tenant-Id"
+  ATLAS_REQUIRE_TENANT: "true"
+  ATLAS_DESTRUCTIVE_TOOL_REQUIRES_APPROVAL: "true"

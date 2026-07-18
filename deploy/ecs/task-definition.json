@@ -1,0 +1,47 @@
+{
+  "family": "atlas-mcp",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "runtimePlatform": { "cpuArchitecture": "X86_64", "operatingSystemFamily": "LINUX" },
+  "taskRoleArn": "arn:aws:iam::<account>:role/atlas-mcp-task",
+  "executionRoleArn": "arn:aws:iam::<account>:role/atlas-mcp-exec",
+  "containerDefinitions": [
+    {
+      "name": "atlas-mcp",
+      "image": "<account>.dkr.ecr.<region>.amazonaws.com/atlas-mcp@sha256:REPLACE_WITH_DIGEST",
+      "essential": true,
+      "portMappings": [{ "containerPort": 8080, "protocol": "tcp" }],
+      "environment": [
+        { "name": "ATLAS_TRANSPORT", "value": "http" },
+        { "name": "ATLAS_HTTP_HOST", "value": "0.0.0.0" },
+        { "name": "ATLAS_HTTP_PORT", "value": "8080" },
+        { "name": "ATLAS_STATELESS_MODE", "value": "true" },
+        { "name": "ATLAS_POLICY_DEFAULT_DENY", "value": "true" },
+        { "name": "ATLAS_REQUIRE_TENANT", "value": "true" },
+        { "name": "ATLAS_DESTRUCTIVE_TOOL_REQUIRES_APPROVAL", "value": "true" }
+      ],
+      "secrets": [
+        { "name": "ATLAS_POSTGRES_DSN", "valueFrom": "arn:aws:secretsmanager:<region>:<account>:secret:atlas/postgres_dsn" },
+        { "name": "ANTHROPIC_API_KEY", "valueFrom": "arn:aws:secretsmanager:<region>:<account>:secret:atlas/anthropic_api_key" },
+        { "name": "ATLAS_EMBEDDING_KEY", "valueFrom": "arn:aws:secretsmanager:<region>:<account>:secret:atlas/embedding_key" }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -fsS http://localhost:8080/healthz || exit 1"],
+        "interval": 10,
+        "timeout": 3,
+        "retries": 3,
+        "startPeriod": 15
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/atlas-mcp",
+          "awslogs-region": "<region>",
+          "awslogs-stream-prefix": "atlas-mcp"
+        }
+      }
+    }
+  ]
+}

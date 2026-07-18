@@ -1,0 +1,99 @@
+# Atlas-MCP server Deployment.
+#
+# Stateless (ATLAS_STATELESS_MODE=true) so it scales horizontally: shared
+# state (rate-limit buckets, L2 cache) lives in Redis, not in the pod.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: atlas-mcp
+  labels:
+    app.kubernetes.io/name: atlas-mcp
+    app.kubernetes.io/component: server
+spec:
+  replicas: 3
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: atlas-mcp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: atlas-mcp
+        app.kubernetes.io/component: server
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: atlas-mcp
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: atlas-mcp
+          image: ghcr.io/your-org/atlas-mcp:latest # pin to a digest in prod
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: atlas-mcp-config
+            - secretRef:
+                name: atlas-mcp-secrets
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: audit-logs
+              mountPath: /var/log/atlas
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: audit-logs
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: atlas-mcp
+  labels:
+    app.kubernetes.io/name: atlas-mcp
+  # For AWS IRSA, annotate with the IAM role that grants S3 access:
+  # annotations:
+  #   eks.amazonaws.com/role-arn: arn:aws:iam::<account>:role/atlas-mcp-s3
