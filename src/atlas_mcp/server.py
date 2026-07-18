@@ -24,6 +24,7 @@ from atlas_mcp.config import ServerSettings, get_settings
 from atlas_mcp.context import current_context
 from atlas_mcp.errors.framework import PolicyError, ToolError, as_call_tool_result, normalise_exception
 from atlas_mcp.governance.http_allowlist import HttpAllowlist
+from atlas_mcp.reliability import ATBA, CircuitBreakerRegistry, with_retry
 from atlas_mcp.tools.base import Tool
 from atlas_mcp.tools.registry import ToolRegistry
 from atlas_mcp.validation.schemas import ToolCallEnvelope
@@ -43,6 +44,8 @@ class AtlasServer:
             default_deny=settings.policy_default_deny,
         )
         self.http_allowlist = HttpAllowlist.from_file(settings.http_allowlist_file)
+        self.breakers = CircuitBreakerRegistry(settings)
+        self.atba = ATBA(settings.atba_total_budget_ms)
         self._register_mcp_handlers()
 
     def _register_mcp_handlers(self) -> None:
@@ -97,16 +100,43 @@ class AtlasServer:
                 "caller": envelope.caller,
             },
         )
-        try:
-            return await tool.execute(envelope.tenant, validated_args)
-        except ToolError:
-            raise
-        except Exception as exc:
-            logger.exception(
-                "tool_execution_failed",
-                extra={"tool": envelope.tool, "tenant": envelope.tenant},
-            )
-            raise normalise_exception(exc, tool=envelope.tool) from exc
+        return await self._execute_reliably(tool, envelope, validated_args)
+
+    async def _execute_reliably(
+        self, tool: Tool, envelope: ToolCallEnvelope, validated_args: BaseModel
+    ) -> dict:
+        """Run the tool behind ATBA budget → circuit breaker → retry.
+
+        Ordering rationale: the ATBA timeout bounds the whole attempt; the
+        breaker fast-fails when the backend is known-dead; retry only wraps
+        idempotent (non-destructive) tools so a transient blip self-heals
+        without duplicating a write.
+        """
+        breaker = self.breakers.for_tool(tool.meta.name)
+        retryable = not tool.meta.destructive
+
+        async def _run() -> dict:
+            try:
+                return await tool.execute(envelope.tenant, validated_args)
+            except ToolError:
+                raise
+            except Exception as exc:
+                logger.exception(
+                    "tool_execution_failed",
+                    extra={"tool": envelope.tool, "tenant": envelope.tenant},
+                )
+                raise normalise_exception(exc, tool=envelope.tool) from exc
+
+        async def _guarded() -> dict:
+            if retryable:
+                return await with_retry(
+                    _run,
+                    max_attempts=self.settings.retry_max_attempts,
+                    base_delay_ms=self.settings.retry_base_delay_ms,
+                )
+            return await _run()
+
+        return await self.atba.call_with_budget(tool.meta.name, breaker.call(_guarded))
 
     async def startup(self) -> None:
         await self.registry.discover()
