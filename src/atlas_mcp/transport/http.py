@@ -8,8 +8,10 @@ from typing import TYPE_CHECKING, AsyncIterator
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from starlette.routing import Mount, Route
+
+from atlas_mcp.observability.metrics import CONTENT_TYPE
 
 from atlas_mcp.auth.middleware import AuthMiddleware
 from atlas_mcp.governance.tenant import TenantMiddleware
@@ -30,6 +32,13 @@ def build_readyz(server: "AtlasServer"):
         return JSONResponse({"status": "ready"})
 
     return readyz
+
+
+def build_metrics(server: "AtlasServer"):
+    async def metrics(_request) -> Response:
+        return Response(content=server.metrics.render(), media_type=CONTENT_TYPE)
+
+    return metrics
 
 
 def build_http_app(server: "AtlasServer") -> Starlette:
@@ -58,6 +67,7 @@ def build_http_app(server: "AtlasServer") -> Starlette:
         Route("/.well-known/mcp-server", endpoint=server.registry.well_known_endpoint),
         Route("/healthz", endpoint=healthz),
         Route("/readyz", endpoint=build_readyz(server)),
+        Route("/metrics", endpoint=build_metrics(server)),
         Mount("/mcp", app=session_manager.handle_request),
     ]
     return Starlette(routes=routes, middleware=middleware, lifespan=lifespan)

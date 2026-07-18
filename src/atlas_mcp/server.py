@@ -32,6 +32,7 @@ from atlas_mcp.errors.framework import (
     normalise_exception,
 )
 from atlas_mcp.governance.http_allowlist import HttpAllowlist
+from atlas_mcp.observability.metrics import MetricsRegistry
 from atlas_mcp.reliability import ATBA, CircuitBreakerRegistry, ReliabilityMetrics, with_retry
 from atlas_mcp.tools.base import Tool
 from atlas_mcp.tools.registry import ToolRegistry
@@ -60,6 +61,8 @@ class AtlasServer:
         self.rate_limiter = RateLimiter(settings, backend=rl_backend)
         l2_backend = None if settings.redis_backend else InMemoryL2()
         self.cache = CacheManager(settings, l2=l2_backend)
+
+        self.metrics = MetricsRegistry()
 
         self._register_mcp_handlers()
 
