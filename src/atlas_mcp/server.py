@@ -20,8 +20,10 @@ from mcp.server import Server
 from pydantic import BaseModel
 
 from atlas_mcp.auth.policy import PolicyEngine
+from atlas_mcp.cache.manager import CacheManager, InMemoryL2
 from atlas_mcp.config import ServerSettings, get_settings
 from atlas_mcp.context import current_context
+from atlas_mcp.ratelimit.limiter import InMemoryTokenBucket, RateLimiter
 from atlas_mcp.errors.framework import (
     CircuitOpenError,
     PolicyError,
@@ -53,6 +55,12 @@ class AtlasServer:
         self.breakers = CircuitBreakerRegistry(settings)
         self.atba = ATBA(settings.atba_total_budget_ms)
         self.reliability_metrics = ReliabilityMetrics()
+
+        rl_backend = None if settings.redis_backend else InMemoryTokenBucket()
+        self.rate_limiter = RateLimiter(settings, backend=rl_backend)
+        l2_backend = None if settings.redis_backend else InMemoryL2()
+        self.cache = CacheManager(settings, l2=l2_backend)
+
         self._register_mcp_handlers()
 
     def reliability_snapshot(self) -> dict:
@@ -103,6 +111,10 @@ class AtlasServer:
         )
         _enforce_http_allowlist(self.http_allowlist, envelope.tenant, validated_args)
 
+        # Rate limit only after policy passes, so denied calls never burn quota.
+        if self.settings.rate_limit_enabled:
+            await self.rate_limiter.acquire(envelope.tenant, tool.meta.name)
+
         logger.info(
             "tool_dispatch",
             extra={
@@ -111,6 +123,19 @@ class AtlasServer:
                 "caller": envelope.caller,
             },
         )
+
+        # Cache sits after rate limit and before the breaker, so a warm cache
+        # keeps serving reads while a downstream backend is in an outage.
+        if self.settings.cache_enabled and tool.cacheable:
+            key = tool.cache_key(envelope.tenant, validated_args)
+
+            async def _compute() -> dict:
+                return await self._execute_reliably(tool, envelope, validated_args)
+
+            return await self.cache.get_or_compute(
+                key, _compute, ttl=tool.cache_ttl_seconds
+            )
+
         return await self._execute_reliably(tool, envelope, validated_args)
 
     async def _execute_reliably(

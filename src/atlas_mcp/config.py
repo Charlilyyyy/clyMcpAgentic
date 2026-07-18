@@ -52,6 +52,11 @@ class ServerSettings(BaseSettings):
     rate_limit_default_rpm: int = 60
     rate_limit_burst: int = 20
     redis_url: str = "redis://localhost:6379/0"
+    # When False (dev/test default) rate limiting and L2 cache use in-process
+    # backends. Set ATLAS_REDIS_BACKEND=true in production for shared state.
+    redis_backend: bool = False
+    rate_limit_enabled: bool = True
+    cache_enabled: bool = True
 
     # Caching
     cache_l1_max_items: int = 10_000
