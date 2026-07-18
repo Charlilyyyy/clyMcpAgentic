@@ -62,10 +62,16 @@ class Tool(ABC):
             ) from exc
 
     def cache_key(self, tenant: str, args: BaseModel) -> str:
-        """Deterministic hash used by the cache layer."""
-        payload = {"tool": self.meta.name, "tenant": tenant, "args": args.model_dump(mode="json")}
+        """Deterministic cache key with a tenant/tool prefix.
+
+        The ``atlas:{tenant}:{tool}:`` prefix is what makes targeted
+        invalidation possible (drop one tenant, or one tenant+tool) without
+        needing to know every argument hash.
+        """
+        payload = {"args": args.model_dump(mode="json")}
         blob = json.dumps(payload, sort_keys=True, default=str).encode()
-        return f"atlas:{self.meta.name}:{hashlib.sha256(blob).hexdigest()[:24]}"
+        digest = hashlib.sha256(blob).hexdigest()[:24]
+        return f"atlas:{tenant}:{self.meta.name}:{digest}"
 
     @property
     def cacheable(self) -> bool:

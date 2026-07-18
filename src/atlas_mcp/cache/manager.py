@@ -26,6 +26,7 @@ class L2Backend(Protocol):
     async def get(self, key: str) -> str | None: ...
     async def set(self, key: str, value: str, ttl_seconds: int) -> None: ...
     async def delete(self, key: str) -> None: ...
+    async def delete_prefix(self, prefix: str) -> int: ...
     async def acquire_lock(self, lock_key: str, ttl_ms: int) -> bool: ...
     async def release_lock(self, lock_key: str) -> None: ...
 
@@ -53,6 +54,12 @@ class InMemoryL2:
 
     async def delete(self, key: str) -> None:
         self._store.pop(key, None)
+
+    async def delete_prefix(self, prefix: str) -> int:
+        matched = [k for k in self._store if k.startswith(prefix)]
+        for k in matched:
+            self._store.pop(k, None)
+        return len(matched)
 
     async def acquire_lock(self, lock_key: str, ttl_ms: int) -> bool:
         expires = self._locks.get(lock_key)
@@ -88,6 +95,14 @@ class RedisL2:
 
     async def delete(self, key: str) -> None:
         await (await self._ensure()).delete(key)
+
+    async def delete_prefix(self, prefix: str) -> int:
+        redis = await self._ensure()
+        deleted = 0
+        async for key in redis.scan_iter(match=f"{prefix}*"):
+            await redis.delete(key)
+            deleted += 1
+        return deleted
 
     async def acquire_lock(self, lock_key: str, ttl_ms: int) -> bool:
         return bool(await (await self._ensure()).set(lock_key, "1", nx=True, px=ttl_ms))
@@ -169,6 +184,32 @@ class CacheManager:
         value = await compute()
         await self.set(key, value, ttl=ttl)
         return value
+
+    # ── Invalidation strategy ─────────────────────────────────────────────
+    # Cache keys are ``atlas:{tenant}:{tool}:{args_hash}``. That prefix layout
+    # supports three levels of invalidation, cheapest to most surgical:
+    #
+    #   1. TTL expiry (default): every entry self-expires; correctness bounded
+    #      by ``cache_l2_ttl_seconds``. This is the baseline — no code needed.
+    #   2. Write-triggered, tool-scoped: after a destructive tool mutates data
+    #      for a tenant, call ``invalidate_tool(tenant, read_tool)`` to drop the
+    #      matching read cache (e.g. ``s3.put_object`` → drop ``s3.get_object``).
+    #   3. Tenant-wide: ``invalidate_tenant(tenant)`` on a tenant-level event
+    #      (data reset, GDPR delete) drops every entry for that tenant.
+    async def invalidate_key(self, key: str) -> None:
+        await self.delete(key)
+
+    async def invalidate_tool(self, tenant: str, tool: str) -> int:
+        prefix = f"atlas:{tenant}:{tool}:"
+        return await self._invalidate_prefix(prefix)
+
+    async def invalidate_tenant(self, tenant: str) -> int:
+        prefix = f"atlas:{tenant}:"
+        return await self._invalidate_prefix(prefix)
+
+    async def _invalidate_prefix(self, prefix: str) -> int:
+        await self.l1.delete_prefix(prefix)
+        return await self._get_l2().delete_prefix(prefix)
 
     def stats(self) -> dict[str, Any]:
         total = self.hits + self.misses

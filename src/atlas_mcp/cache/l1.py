@@ -51,5 +51,12 @@ class L1Cache:
         async with self._lock:
             self._store.pop(key, None)
 
+    async def delete_prefix(self, prefix: str) -> int:
+        async with self._lock:
+            matched = [k for k in self._store if k.startswith(prefix)]
+            for k in matched:
+                self._store.pop(k, None)
+            return len(matched)
+
     def __len__(self) -> int:
         return len(self._store)
